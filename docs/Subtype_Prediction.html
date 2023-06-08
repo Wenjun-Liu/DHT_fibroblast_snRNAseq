@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Wenjun Liu Dame Roma Mitchell Cancer Research Laboratories Adelaide Medical School University of Adelaide" />
+
+<meta name="date" content="2023-01-29" />
+
+<title>Subtype_Prediction</title>
+
+<script src="site_libs/header-attrs-2.21/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<script src="site_libs/htmlwidgets-1.6.2/htmlwidgets.js"></script>
+<link href="site_libs/datatables-css-0.0.0/datatables-crosstalk.css" rel="stylesheet" />
+<script src="site_libs/datatables-binding-0.27/datatables.js"></script>
+<link href="site_libs/dt-core-1.12.1/css/jquery.dataTables.min.css" rel="stylesheet" />
+<link href="site_libs/dt-core-1.12.1/css/jquery.dataTables.extra.css" rel="stylesheet" />
+<script src="site_libs/dt-core-1.12.1/js/jquery.dataTables.min.js"></script>
+<link href="site_libs/nouislider-7.0.10/jquery.nouislider.min.css" rel="stylesheet" />
+<script src="site_libs/nouislider-7.0.10/jquery.nouislider.min.js"></script>
+<link href="site_libs/selectize-0.12.0/selectize.bootstrap3.css" rel="stylesheet" />
+<script src="site_libs/selectize-0.12.0/selectize.min.js"></script>
+<link href="site_libs/crosstalk-1.2.0/css/crosstalk.min.css" rel="stylesheet" />
+<script src="site_libs/crosstalk-1.2.0/js/crosstalk.min.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">DHT_fibroblast_snRNAseq</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="Preprocess_fibro_from10x.html">Pre-processing</a>
+</li>
+<li>
+  <a href="Subtype_Prediction.html">Cell Type Annotation</a>
+</li>
+<li>
+  <a href="Differential_Expression.html">Differential Expression &amp; Pathway Analysis</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Subtype_Prediction</h1>
+<h4 class="author">Wenjun Liu<br>Dame Roma Mitchell Cancer Research
+Laboratories<br>Adelaide Medical School<br>University of Adelaide</h4>
+<h4 class="date">2023-01-29</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2023-06-08
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 1
+</p>
+<p>
+<strong>Knit directory:</strong> <code>DHT_fibroblast_snRNAseq/</code>
+<span class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.0). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges">
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted
+changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R
+Markdown file created these results, you’ll want to first commit it to
+the Git repo. If you’re still working on the analysis, you can ignore
+this warning. When you’re finished, you can run
+<code>wflow_publish</code> to commit the R Markdown file and build the
+HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20230528code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20230528)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20230528code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20230528)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomWenjunLiuDHTfibroblastsnRNAseqtree2a242676e6a7843e55e195d7b05e45847b7a1b4btargetblank2a24267a">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/Wenjun-Liu/DHT_fibroblast_snRNAseq/tree/2a242676e6a7843e55e195d7b05e45847b7a1b4b" target="_blank">2a24267</a>
+</a>
+</p>
+</div>
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomWenjunLiuDHTfibroblastsnRNAseqtree2a242676e6a7843e55e195d7b05e45847b7a1b4btargetblank2a24267a"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version
+<a href="https://github.com/Wenjun-Liu/DHT_fibroblast_snRNAseq/tree/2a242676e6a7843e55e195d7b05e45847b7a1b4b" target="_blank">2a24267</a>.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    data/mf43/
+    Ignored:    data/mf61/
+    Ignored:    data/sca.rds
+    Ignored:    output/fibroblast_seurat.rds
+
+Untracked files:
+    Untracked:  .DS_Store
+    Untracked:  analysis/Differential_Expression.Rmd
+    Untracked:  analysis/Preprocess_fibro_from10x.Rmd
+    Untracked:  analysis/Subtype_Prediction.Rmd
+    Untracked:  analysis/make_gsNetwork.R
+    Untracked:  analysis/plot_commu_temp.R
+    Untracked:  data/.DS_Store
+    Untracked:  data/AR_sig_down.csv
+    Untracked:  data/AR_sig_up.csv
+    Untracked:  data/Wu_2020/
+    Untracked:  data/genesGR.rds
+    Untracked:  output/Table_Chap5_Supp3.xlsx
+    Untracked:  output/pred_hpca.rds
+    Untracked:  output/pred_wu.rds
+    Untracked:  output/zlm_summary_mixed.rds
+
+Unstaged changes:
+    Modified:   .gitignore
+    Modified:   README.md
+    Modified:   analysis/_site.yml
+    Deleted:    analysis/about.Rmd
+    Modified:   analysis/index.Rmd
+    Deleted:    analysis/license.Rmd
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with
+<code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<pre class="r"><code>library(tidyverse)
+library(yaml)
+library(scales)
+library(pander)
+library(glue)
+library(edgeR)
+library(AnnotationHub)
+library(ensembldb)
+library(cowplot)
+library(ggfortify)
+library(magrittr)
+library(cqn)
+library(ggrepel)
+library(DT)
+library(Seurat)
+library(corrplot)
+library(plotly)
+library(patchwork)
+library(colorspace)
+library(ggpubr)
+library(randomcoloR)
+library(ggforce)
+library(MAST)
+library(pheatmap)
+library(BiocParallel)
+library(SingleR)
+library(celldex)</code></pre>
+<pre class="r"><code>panderOptions(&quot;table.split.table&quot;, Inf)
+panderOptions(&quot;big.mark&quot;, &quot;,&quot;)
+theme_set(theme_bw())</code></pre>
+<pre class="r"><code>formatP &lt;- function(p, m = 0.0001){
+out &lt;- rep(&quot;&quot;, length(p))
+out[p &lt; m] &lt;- sprintf(&quot;%.2e&quot;, p[p&lt;m])
+out[p &gt;= m] &lt;- sprintf(&quot;%.4f&quot;, p[p&gt;=m])
+out
+}</code></pre>
+<div id="gene-annotations" class="section level2">
+<h2>Gene Annotations</h2>
+<pre class="r"><code>ah &lt;- AnnotationHub() %&gt;%
+  subset(rdataclass == &quot;EnsDb&quot;) %&gt;%
+  subset(str_detect(description, &quot;101&quot;)) %&gt;%
+  subset(genome == &quot;GRCh38&quot;)
+stopifnot(length(ah) == 1)</code></pre>
+<pre class="r"><code>ensDb &lt;- ah[[1]]
+genesGR &lt;- genes(ensDb)
+transGR &lt;- transcripts(ensDb)</code></pre>
+<pre class="r"><code>mcols(transGR) &lt;- mcols(transGR) %&gt;%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c(&quot;nexon&quot;, &quot;tx_len&quot;)]
+  )</code></pre>
+<pre class="r"><code>mcols(genesGR) &lt;- mcols(genesGR) %&gt;%
+  as.data.frame() %&gt;%
+  dplyr::select(
+    gene_id, gene_name, gene_biotype, entrezid
+  ) %&gt;%
+  left_join(
+    mcols(transGR) %&gt;%
+      as.data.frame() %&gt;%
+      mutate(
+        tx_support_level = case_when(
+          is.na(tx_support_level) ~ 1L, 
+          TRUE ~ tx_support_level
+        )
+      ) %&gt;%
+      group_by(gene_id) %&gt;%
+      summarise(
+        n_tx = n(),
+        longest_tx = max(tx_len),
+        ave_tx_len = mean(tx_len),
+        gc_content = sum(tx_len*gc_content) / sum(tx_len)
+      ) %&gt;%
+      mutate(
+        bin_length = cut(
+          x = ave_tx_len,
+          labels = seq_len(10),
+          breaks = quantile(ave_tx_len, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin_gc = cut(
+          x = gc_content,
+          labels = seq_len(10),
+          breaks = quantile(gc_content, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin = paste(bin_gc, bin_length, sep = &quot;_&quot;)
+      ),
+    by = &quot;gene_id&quot;
+  ) %&gt;%
+  set_rownames(.$gene_id) %&gt;%
+  as(&quot;DataFrame&quot;)</code></pre>
+</div>
+<div id="read-in-seurat-object" class="section level1">
+<h1>Read in seurat object</h1>
+<p>The pre-processed <code>seurat</code> object was loaded.</p>
+<pre class="r"><code>fibroblast &lt;- readRDS(here::here(&quot;output/fibroblast_seurat.rds&quot;))</code></pre>
+<pre class="r"><code># Color palettes used by most scRNA-seq methods could be found [here](https://rdrr.io/bioc/scater/src/R/plot_colours.R). 
+patient_col &lt;- c(
+    &quot;MF61&quot; = &quot;#A71B4B&quot;, 
+    &quot;MF43&quot; = &quot;#584B9F&quot;
+)
+# scanpy colors were found in https://github.com/scverse/scanpy/blob/034ca2823804645e0d4874c9b16ba2eb8c13ac0f/scanpy/plotting/palettes.py
+treat_col &lt;- c(
+  VEH = rgb(0.7, 0.7, 0.7),
+  DHT = rgb(0.8, 0.2, 0.2))
+sample_col &lt;- hcl.colors(n = 4) %&gt;%
+    set_names(c(&quot;mf43DHT&quot;, &quot;mf43VEH&quot;, &quot;mf61DHT&quot;, &quot;mf61VEH&quot;))</code></pre>
+</div>
+<div id="use-references-from-celldex" class="section level1">
+<h1>Use references from <code>celldex</code></h1>
+<p>The <code>celldex</code> package provides access to several reference
+datasets (mostly derived from bulk RNA-seq or microarray data) through
+dedicated retrieval functions. Here, we will use the Human Primary Cell
+Atlas (Mabbott et al. 2013), represented as a
+<code>SummarizedExperiment</code> object containing a matrix of
+log-expression values with sample-level labels.</p>
+<p>The HPCA reference consists of publicly available microarray datasets
+derived from human primary cells (Mabbott et al. 2013). Most of the
+labels refer to blood subpopulations but cell types from other tissues
+are also available. The main cell types and their associated reference
+numbers were:</p>
+<pre class="r"><code>hpca.se &lt;- HumanPrimaryCellAtlasData()
+table(colData(hpca.se)$label.main) %&gt;%
+   enframe(
+       name = &quot;Main cell type&quot;, 
+       value = &quot;Number of reference&quot;
+   ) %&gt;%
+    mutate(
+        `Main cell type` = as.factor(`Main cell type`)
+    ) %&gt;%
+    datatable(
+        filter = &quot;top&quot;
+    )</code></pre>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-10409ba4b9dde7cce5fa" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-10409ba4b9dde7cce5fa">{"x":{"filter":"top","vertical":false,"filterHTML":"<tr>\n  <td><\/td>\n  <td data-type=\"factor\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"width: 100%; display: none;\">\n      <select multiple=\"multiple\" style=\"width: 100%;\" data-options=\"[&quot;Astrocyte&quot;,&quot;B_cell&quot;,&quot;BM&quot;,&quot;BM &amp; Prog.&quot;,&quot;Chondrocytes&quot;,&quot;CMP&quot;,&quot;DC&quot;,&quot;Embryonic_stem_cells&quot;,&quot;Endothelial_cells&quot;,&quot;Epithelial_cells&quot;,&quot;Erythroblast&quot;,&quot;Fibroblasts&quot;,&quot;Gametocytes&quot;,&quot;GMP&quot;,&quot;Hepatocytes&quot;,&quot;HSC_-G-CSF&quot;,&quot;HSC_CD34+&quot;,&quot;iPS_cells&quot;,&quot;Keratinocytes&quot;,&quot;Macrophage&quot;,&quot;MEP&quot;,&quot;Monocyte&quot;,&quot;MSC&quot;,&quot;Myelocyte&quot;,&quot;Neuroepithelial_cell&quot;,&quot;Neurons&quot;,&quot;Neutrophils&quot;,&quot;NK_cell&quot;,&quot;Osteoblasts&quot;,&quot;Platelets&quot;,&quot;Pre-B_cell_CD34-&quot;,&quot;Pro-B_cell_CD34+&quot;,&quot;Pro-Myelocyte&quot;,&quot;Smooth_muscle_cells&quot;,&quot;T_cells&quot;,&quot;Tissue_stem_cells&quot;]\"><\/select>\n    <\/div>\n  <\/td>\n  <td data-type=\"integer\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none;position: absolute;width: 200px;opacity: 1\">\n      <div data-min=\"1\" data-max=\"90\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36"],["Astrocyte","B_cell","BM","BM &amp; Prog.","Chondrocytes","CMP","DC","Embryonic_stem_cells","Endothelial_cells","Epithelial_cells","Erythroblast","Fibroblasts","Gametocytes","GMP","Hepatocytes","HSC_-G-CSF","HSC_CD34+","iPS_cells","Keratinocytes","Macrophage","MEP","Monocyte","MSC","Myelocyte","Neuroepithelial_cell","Neurons","Neutrophils","NK_cell","Osteoblasts","Platelets","Pre-B_cell_CD34-","Pro-B_cell_CD34+","Pro-Myelocyte","Smooth_muscle_cells","T_cells","Tissue_stem_cells"],[2,26,7,1,8,2,88,17,64,16,8,10,5,2,3,10,6,42,25,90,2,60,9,2,1,16,21,5,15,5,2,2,2,16,68,55]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>Main cell type<\/th>\n      <th>Number of reference<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":2},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false,"orderCellsTop":true},"selection":{"mode":"multiple","selected":null,"target":"row","selectable":null}},"evals":[],"jsHooks":[]}</script>
+<p>Each reference provides three levels of cell type annotation in its
+column metadata:</p>
+<ul>
+<li><code>label.main</code>, broad annotation that defines the major
+cell types. This has few unique levels that allows for fast annotation
+but at low resolution.</li>
+<li><code>label.fine</code>, fine-grained annotation that defines
+subtypes or states. This has more unique levels that results in slower
+annotation but at much higher resolution.</li>
+<li><code>label.ont</code>, fine-grained annotation mapped to the
+standard vocabulary in the Cell Ontology. This enables synchronization
+of labels across references as well as dynamic adjustment of the
+resolution.</li>
+</ul>
+<pre class="r"><code>colData(hpca.se) %&gt;%
+    as.data.frame() %&gt;%
+    mutate_all(as.factor) %&gt;%
+    datatable(
+        filter = &quot;top&quot;
+    )</code></pre>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-da53d320ee7a5eb5d707" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-da53d320ee7a5eb5d707">{"x":{"filter":"top","vertical":false,"filterHTML":"<tr>\n  <td><\/td>\n  <td data-type=\"factor\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"width: 100%; display: none;\">\n      <select multiple=\"multiple\" style=\"width: 100%;\" data-options=\"[&quot;Astrocyte&quot;,&quot;B_cell&quot;,&quot;BM&quot;,&quot;BM &amp; Prog.&quot;,&quot;Chondrocytes&quot;,&quot;CMP&quot;,&quot;DC&quot;,&quot;Embryonic_stem_cells&quot;,&quot;Endothelial_cells&quot;,&quot;Epithelial_cells&quot;,&quot;Erythroblast&quot;,&quot;Fibroblasts&quot;,&quot;Gametocytes&quot;,&quot;GMP&quot;,&quot;Hepatocytes&quot;,&quot;HSC_-G-CSF&quot;,&quot;HSC_CD34+&quot;,&quot;iPS_cells&quot;,&quot;Keratinocytes&quot;,&quot;Macrophage&quot;,&quot;MEP&quot;,&quot;Monocyte&quot;,&quot;MSC&quot;,&quot;Myelocyte&quot;,&quot;Neuroepithelial_cell&quot;,&quot;Neurons&quot;,&quot;Neutrophils&quot;,&quot;NK_cell&quot;,&quot;Osteoblasts&quot;,&quot;Platelets&quot;,&quot;Pre-B_cell_CD34-&quot;,&quot;Pro-B_cell_CD34+&quot;,&quot;Pro-Myelocyte&quot;,&quot;Smooth_muscle_cells&quot;,&quot;T_cells&quot;,&quot;Tissue_stem_cells&quot;]\"><\/select>\n    <\/div>\n  <\/td>\n  <td data-type=\"factor\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"width: 100%; display: none;\">\n      <select multiple=\"multiple\" style=\"width: 100%;\" data-options=\"[&quot;Astrocyte:Embryonic_stem_cell-derived&quot;,&quot;B_cell&quot;,&quot;B_cell:CXCR4-_centrocyte&quot;,&quot;B_cell:CXCR4+_centroblast&quot;,&quot;B_cell:Germinal_center&quot;,&quot;B_cell:immature&quot;,&quot;B_cell:Memory&quot;,&quot;B_cell:Naive&quot;,&quot;B_cell:Plasma_cell&quot;,&quot;BM&quot;,&quot;Chondrocytes:MSC-derived&quot;,&quot;CMP&quot;,&quot;DC:monocyte-derived&quot;,&quot;DC:monocyte-derived:A._fumigatus_germ_tubes_6h&quot;,&quot;DC:monocyte-derived:AEC-conditioned&quot;,&quot;DC:monocyte-derived:AM580&quot;,&quot;DC:monocyte-derived:anti-DC-SIGN_2h&quot;,&quot;DC:monocyte-derived:antiCD40/VAF347&quot;,&quot;DC:monocyte-derived:CD40L&quot;,&quot;DC:monocyte-derived:Galectin-1&quot;,&quot;DC:monocyte-derived:immature&quot;,&quot;DC:monocyte-derived:LPS&quot;,&quot;DC:monocyte-derived:mature&quot;,&quot;DC:monocyte-derived:Poly(IC)&quot;,&quot;DC:monocyte-derived:rosiglitazone&quot;,&quot;DC:monocyte-derived:rosiglitazone/AGN193109&quot;,&quot;DC:monocyte-derived:Schuler_treatment&quot;,&quot;Embryonic_stem_cells&quot;,&quot;Endothelial_cells:blood_vessel&quot;,&quot;Endothelial_cells:HUVEC&quot;,&quot;Endothelial_cells:HUVEC:B._anthracis_LT&quot;,&quot;Endothelial_cells:HUVEC:Borrelia_burgdorferi&quot;,&quot;Endothelial_cells:HUVEC:FPV-infected&quot;,&quot;Endothelial_cells:HUVEC:H5N1-infected&quot;,&quot;Endothelial_cells:HUVEC:IFNg&quot;,&quot;Endothelial_cells:HUVEC:IL-1b&quot;,&quot;Endothelial_cells:HUVEC:PR8-infected&quot;,&quot;Endothelial_cells:HUVEC:Serum_Amyloid_A&quot;,&quot;Endothelial_cells:HUVEC:VEGF&quot;,&quot;Endothelial_cells:lymphatic&quot;,&quot;Endothelial_cells:lymphatic:KSHV&quot;,&quot;Endothelial_cells:lymphatic:TNFa_48h&quot;,&quot;Epithelial_cells:bladder&quot;,&quot;Epithelial_cells:bronchial&quot;,&quot;Erythroblast&quot;,&quot;Fibroblasts:breast&quot;,&quot;Fibroblasts:foreskin&quot;,&quot;Gametocytes:oocyte&quot;,&quot;Gametocytes:spermatocyte&quot;,&quot;GMP&quot;,&quot;Hepatocytes&quot;,&quot;HSC_-G-CSF&quot;,&quot;HSC_CD34+&quot;,&quot;iPS_cells:adipose_stem_cell-derived:lentiviral&quot;,&quot;iPS_cells:adipose_stem_cell-derived:minicircle-derived&quot;,&quot;iPS_cells:adipose_stem_cells&quot;,&quot;iPS_cells:CRL2097_foreskin&quot;,&quot;iPS_cells:CRL2097_foreskin-derived:d20_hepatic_diff&quot;,&quot;iPS_cells:CRL2097_foreskin-derived:undiff.&quot;,&quot;iPS_cells:fibroblast-derived:Direct_del._reprog&quot;,&quot;iPS_cells:fibroblast-derived:Retroviral_transf&quot;,&quot;iPS_cells:fibroblasts&quot;,&quot;iPS_cells:foreskin_fibrobasts&quot;,&quot;iPS_cells:iPS:minicircle-derived&quot;,&quot;iPS_cells:PDB_1lox-17Puro-10&quot;,&quot;iPS_cells:PDB_1lox-17Puro-5&quot;,&quot;iPS_cells:PDB_1lox-21Puro-20&quot;,&quot;iPS_cells:PDB_1lox-21Puro-26&quot;,&quot;iPS_cells:PDB_2lox-17&quot;,&quot;iPS_cells:PDB_2lox-21&quot;,&quot;iPS_cells:PDB_2lox-22&quot;,&quot;iPS_cells:PDB_2lox-5&quot;,&quot;iPS_cells:PDB_fibroblasts&quot;,&quot;iPS_cells:skin_fibroblast&quot;,&quot;iPS_cells:skin_fibroblast-derived&quot;,&quot;Keratinocytes&quot;,&quot;Keratinocytes:IFNg&quot;,&quot;Keratinocytes:IL19&quot;,&quot;Keratinocytes:IL1b&quot;,&quot;Keratinocytes:IL20&quot;,&quot;Keratinocytes:IL22&quot;,&quot;Keratinocytes:IL24&quot;,&quot;Keratinocytes:IL26&quot;,&quot;Keratinocytes:KGF&quot;,&quot;Macrophage:Alveolar&quot;,&quot;Macrophage:Alveolar:B._anthacis_spores&quot;,&quot;Macrophage:monocyte-derived&quot;,&quot;Macrophage:monocyte-derived:IFNa&quot;,&quot;Macrophage:monocyte-derived:IL-4/cntrl&quot;,&quot;Macrophage:monocyte-derived:IL-4/Dex/cntrl&quot;,&quot;Macrophage:monocyte-derived:IL-4/Dex/TGFb&quot;,&quot;Macrophage:monocyte-derived:IL-4/TGFb&quot;,&quot;Macrophage:monocyte-derived:M-CSF&quot;,&quot;Macrophage:monocyte-derived:M-CSF/IFNg&quot;,&quot;Macrophage:monocyte-derived:M-CSF/IFNg/Pam3Cys&quot;,&quot;Macrophage:monocyte-derived:M-CSF/Pam3Cys&quot;,&quot;Macrophage:monocyte-derived:S._aureus&quot;,&quot;MEP&quot;,&quot;Monocyte&quot;,&quot;Monocyte:anti-FcgRIIB&quot;,&quot;Monocyte:CD14+&quot;,&quot;Monocyte:CD16-&quot;,&quot;Monocyte:CD16+&quot;,&quot;Monocyte:CXCL4&quot;,&quot;Monocyte:F._tularensis_novicida&quot;,&quot;Monocyte:leukotriene_D4&quot;,&quot;Monocyte:MCSF&quot;,&quot;Monocyte:S._typhimurium_flagellin&quot;,&quot;MSC&quot;,&quot;Myelocyte&quot;,&quot;Neuroepithelial_cell:ESC-derived&quot;,&quot;Neurons:adrenal_medulla_cell_line&quot;,&quot;Neurons:ES_cell-derived_neural_precursor&quot;,&quot;Neurons:Schwann_cell&quot;,&quot;Neutrophil&quot;,&quot;Neutrophil:commensal_E._coli_MG1655&quot;,&quot;Neutrophil:GM-CSF_IFNg&quot;,&quot;Neutrophil:inflam&quot;,&quot;Neutrophil:LPS&quot;,&quot;Neutrophil:uropathogenic_E._coli_UTI89&quot;,&quot;NK_cell&quot;,&quot;NK_cell:CD56hiCD62L+&quot;,&quot;NK_cell:IL2&quot;,&quot;Osteoblasts&quot;,&quot;Osteoblasts:BMP2&quot;,&quot;Platelets&quot;,&quot;Pre-B_cell_CD34-&quot;,&quot;Pro-B_cell_CD34+&quot;,&quot;Pro-Myelocyte&quot;,&quot;Smooth_muscle_cells:bronchial&quot;,&quot;Smooth_muscle_cells:bronchial:vit_D&quot;,&quot;Smooth_muscle_cells:umbilical_vein&quot;,&quot;Smooth_muscle_cells:vascular&quot;,&quot;Smooth_muscle_cells:vascular:IL-17&quot;,&quot;T_cell:CCR10-CLA+1,25(OH)2_vit_D3/IL-12&quot;,&quot;T_cell:CCR10+CLA+1,25(OH)2_vit_D3/IL-12&quot;,&quot;T_cell:CD4+&quot;,&quot;T_cell:CD4+_central_memory&quot;,&quot;T_cell:CD4+_effector_memory&quot;,&quot;T_cell:CD4+_Naive&quot;,&quot;T_cell:CD8+&quot;,&quot;T_cell:CD8+_Central_memory&quot;,&quot;T_cell:CD8+_effector_memory&quot;,&quot;T_cell:CD8+_effector_memory_RA&quot;,&quot;T_cell:CD8+_naive&quot;,&quot;T_cell:effector&quot;,&quot;T_cell:gamma-delta&quot;,&quot;T_cell:Treg:Naive&quot;,&quot;Tissue_stem_cells:adipose-derived_MSC_AM3&quot;,&quot;Tissue_stem_cells:BM_MSC&quot;,&quot;Tissue_stem_cells:BM_MSC:BMP2&quot;,&quot;Tissue_stem_cells:BM_MSC:osteogenic&quot;,&quot;Tissue_stem_cells:BM_MSC:TGFb3&quot;,&quot;Tissue_stem_cells:CD326-CD56+&quot;,&quot;Tissue_stem_cells:dental_pulp&quot;,&quot;Tissue_stem_cells:iliac_MSC&quot;,&quot;Tissue_stem_cells:lipoma-derived_MSC&quot;]\"><\/select>\n    <\/div>\n  <\/td>\n  <td data-type=\"factor\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"width: 100%; display: none;\">\n      <select multiple=\"multiple\" style=\"width: 100%;\" data-options=\"[&quot;CL:0000017&quot;,&quot;CL:0000023&quot;,&quot;CL:0000031&quot;,&quot;CL:0000037&quot;,&quot;CL:0000049&quot;,&quot;CL:0000050&quot;,&quot;CL:0000062&quot;,&quot;CL:0000066&quot;,&quot;CL:0000071&quot;,&quot;CL:0000084&quot;,&quot;CL:0000127&quot;,&quot;CL:0000134&quot;,&quot;CL:0000138&quot;,&quot;CL:0000182&quot;,&quot;CL:0000222&quot;,&quot;CL:0000233&quot;,&quot;CL:0000235&quot;,&quot;CL:0000236&quot;,&quot;CL:0000312&quot;,&quot;CL:0000359&quot;,&quot;CL:0000451&quot;,&quot;CL:0000540&quot;,&quot;CL:0000557&quot;,&quot;CL:0000576&quot;,&quot;CL:0000583&quot;,&quot;CL:0000623&quot;,&quot;CL:0000624&quot;,&quot;CL:0000625&quot;,&quot;CL:0000765&quot;,&quot;CL:0000775&quot;,&quot;CL:0000786&quot;,&quot;CL:0000787&quot;,&quot;CL:0000788&quot;,&quot;CL:0000798&quot;,&quot;CL:0000816&quot;,&quot;CL:0000836&quot;,&quot;CL:0000840&quot;,&quot;CL:0000841&quot;,&quot;CL:0000844&quot;,&quot;CL:0000895&quot;,&quot;CL:0000900&quot;,&quot;CL:0000904&quot;,&quot;CL:0000905&quot;,&quot;CL:0000907&quot;,&quot;CL:0000911&quot;,&quot;CL:0000913&quot;,&quot;CL:0000955&quot;,&quot;CL:0000965&quot;,&quot;CL:0000966&quot;,&quot;CL:0001054&quot;,&quot;CL:0001062&quot;,&quot;CL:0002048&quot;,&quot;CL:0002138&quot;,&quot;CL:0002148&quot;,&quot;CL:0002193&quot;,&quot;CL:0002259&quot;,&quot;CL:0002322&quot;,&quot;CL:0002328&quot;,&quot;CL:0002555&quot;,&quot;CL:0002573&quot;,&quot;CL:0002588&quot;,&quot;CL:0002598&quot;,&quot;CL:0002618&quot;,&quot;CL:0002677&quot;,&quot;CL:1001608&quot;]\"><\/select>\n    <\/div>\n  <\/td>\n<\/tr>","data":[["GSM112490","GSM112491","GSM112540","GSM112541","GSM112661","GSM112664","GSM112665","GSM112666","GSM112667","GSM112668","GSM112669","GSM112670","GSM116101","GSM116102","GSM116103","GSM116104","GSM116105","GSM116106","GSM119354","GSM119357","GSM119359","GSM119360","GSM119361","GSM119362","GSM119366","GSM119369","GSM119371","GSM119372","GSM1209554_HH1763_UI33plus2_201004","GSM1209555_HH1778_u133plus2_211004","GSM1209556_HH1786_U133plus2_091104","GSM1209557_HH1791_u133plus2_251104","GSM1209558_HH1713_u133plus2_011004","GSM1209559_HH1712_u133plus2_011004","GSM1209560_HH1714_u133plus2_011004","GSM1209561_TW1681_u133plus2_061004","GSM1209562_TW1685_u133plus2_061004","GSM1209563_TW1689_u133plus2_061004","GSM1209564_HH1765_UI33plus2_201004","GSM1209565_HH1769_UI33plus2_201004","GSM1209566_HH1770_U133plus2_041104","GSM1209567_HH1774_u133plus2_211004","GSM1209568_HH1775_u133plus2_211004","GSM1209569_HH1780_u133plus2_211004","GSM1209570_HH1788_U133plus2_091104","GSM1209571_HH1792_u133plus2_251104","GSM1209572_HH1793_u133plus2_251104","GSM1209573_TW1678_u133plus2_061004","GSM1209574_TW1682_u133plus2_061004","GSM1209575_TW1686_u133plus2_061004","GSM1209576_TW1690_u133plus2_061004","GSM1209577_TW1675_u133plus2_061004","GSM1209578_TW1679_u133plus2_061004","GSM1209579_TW1683_u133plus2_061004","GSM1209580_TW1687_u133plus2_061004","GSM1209581_TW1676_u133plus2_061004","GSM1209582_TW1680_u133plus2_061004","GSM1209583_TW1684_u133plus2_061004","GSM1209584_TW1688_u133plus2_061004","GSM1209585_HH1762_UI33plus2_201004","GSM1209586_HH1767_UI33plus2_201004","GSM1209587_HH1772_u133plus2_211004","GSM1209588_HH1777_U133plus2_041104","GSM1209589_HH1785_U133plus2_011204","GSM1209590_HH1790_U133plus2_091104","GSM1209591_HH1719_u133plus2_011004","GSM1209592_HH1720_u133plus2_011004","GSM1209593_HH1721_u133plus2_011004","GSM1209594_HH1722_u133plus2_011004","GSM1209595_HH1723_u133plus2_011004","GSM1209596_HH1716_u133plus2_011004","GSM1209597_HH1717_u133plus2_011004","GSM1209598_HH1718_u133plus2_011004","GSM1209599_HH1715_u133plus2_011004","GSM132919","GSM132921","GSM132922","GSM132923","GSM132924","GSM132925","GSM132926","GSM132927","GSM132928","GSM132929","GSM132930","GSM140244","GSM140245","GSM140246","GSM140247","GSM140248","GSM140249","GSM140953","GSM140968","GSM140969","GSM140970","GSM140971","GSM140973","GSM141251","GSM141252","GSM141253","GSM141255","GSM143717","GSM143726","GSM143727","GSM143728","GSM143729","GSM143730","GSM143731","GSM143732","GSM143733","GSM143898","GSM143900","GSM143907","GSM143910","GSM143914","GSM153893","GSM154073","GSM154077","GSM154078","GSM154081","GSM154084","GSM158468","GSM158470","GSM160530","GSM160532","GSM160534","GSM160536","GSM172865","GSM172866","GSM172867","GSM172868","GSM172869","GSM172870","GSM173532","GSM173533","GSM173534","GSM173535","GSM173536","GSM173537","GSM173538","GSM173539","GSM173540","GSM173541","GSM173542","GSM173543","GSM173544","GSM173545","GSM173546","GSM173547","GSM173548","GSM173549","GSM173550","GSM173551","GSM173552","GSM173553","GSM173554","GSM173555","GSM173556","GSM178549","GSM178550","GSM178551","GSM178552","GSM178553","GSM178554","GSM178555","GSM178556","GSM178557","GSM178558","GSM181857","GSM181930","GSM181931","GSM181932","GSM181933","GSM181934","GSM181971","GSM181972","GSM181973","GSM181974","GSM181976","GSM181978","GSM181980","GSM181981","GSM181982","GSM181983","GSM181984","GSM181997","GSM181998","GSM181999","GSM182000","GSM182001","GSM182002","GSM182003","GSM182004","GSM183165","GSM183193","GSM183196","GSM183201","GSM183209","GSM183217","GSM183305","GSM183306","GSM183315","GSM183316","GSM183392","GSM183393","GSM183394","GSM183462","GSM183463","GSM183464","GSM183465","GSM183466","GSM183467","GSM183482","GSM183483","GSM183484","GSM183485","GSM183486","GSM183487","GSM189447","GSM189448","GSM189449","GSM189450","GSM189451","GSM189452","GSM189453","GSM189454","GSM198942","GSM198943","GSM198944","GSM198945","GSM225042","GSM230294","GSM239260","GSM239379","GSM239457","GSM239606","GSM239612","GSM239613","GSM239616","GSM239668","GSM239669","GSM250019","GSM250020","GSM250021","GSM260305","GSM260306","GSM260307","GSM260308","GSM260309","GSM260310","GSM260311","GSM260312","GSM260313","GSM260314","GSM260321","GSM260322","GSM260657","GSM260658","GSM260659","GSM260661","GSM260662","GSM260663","GSM260664","GSM260665","GSM260666","GSM260667","GSM260668","GSM260669","GSM260670","GSM260671","GSM260672","GSM260673","GSM260674","GSM260675","GSM260676","GSM260678","GSM260679","GSM260680","GSM260681","GSM260682","GSM260683","GSM260684","GSM260685","GSM260686","GSM260689","GSM260690","GSM260691","GSM260692","GSM260693","GSM260694","GSM260695","GSM260696","GSM260697","GSM260698","GSM260699","GSM260700","GSM260701","GSM264755","GSM264756","GSM264757","GSM264758","GSM265494","GSM265495","GSM265496","GSM265497","GSM265498","GSM265499","GSM279572","GSM279573","GSM279574","GSM279575","GSM279576","GSM279577","GSM279578","GSM279579","GSM279580","GSM279581","GSM279582","GSM279583","GSM279584","GSM286015","GSM286017","GSM286086","GSM286087","GSM286088","GSM286089","GSM286090","GSM286091","GSM287216","GSM287217","GSM287218","GSM287219","GSM287220","GSM287222","GSM289612","GSM289613","GSM289614","GSM289615","GSM289616","GSM289617","GSM289618","GSM290414","GSM290415","GSM290420","GSM290421","GSM290423","GSM299095","GSM299096","GSM299097","GSM299098","GSM299099","GSM299100","GSM299556","GSM299557","GSM299558","GSM299559","GSM299560","GSM299561","GSM299562","GSM299563","GSM299564","GSM299565","GSM300389","GSM300390","GSM300392","GSM300393","GSM300394","GSM300395","GSM300398","GSM300399","GSM300401","GSM300402","GSM300403","GSM300404","GSM304260","GSM304261","GSM304262","GSM305430","GSM305432","GSM305433","GSM305434","GSM305435","GSM305436","GSM305437","GSM305438","GSM305439","GSM305440","GSM305441","GSM305442","GSM305784","GSM305785","GSM305786","GSM305787","GSM310429","GSM310430","GSM310431","GSM310432","GSM310433","GSM310434","GSM310435","GSM310436","GSM310437","GSM310438","GSM310439","GSM310440","GSM320543","GSM320544","GSM320545","GSM320546","GSM320547","GSM320548","GSM320549","GSM320550","GSM320551","GSM320552","GSM322374","GSM322375","GSM322376","GSM322377","GSM330313","GSM330314","GSM330315","GSM330316","GSM335393","GSM335395","GSM335396","GSM335851","GSM335859","GSM335904","GSM335906","GSM336559","GSM343802","GSM343803","GSM343804","GSM343805","GSM343806","GSM343807","GSM343808","GSM343809","GSM343810","GSM343811","GSM343812","GSM343813","GSM343814","GSM343815","GSM343816","GSM343817","GSM343818","GSM343819","GSM343820","GSM343821","GSM343822","GSM343823","GSM343824","GSM343825","GSM343826","GSM343827","GSM343828","GSM343829","GSM343830","GSM343831","GSM346941","GSM346942","GSM346943","GSM346944","GSM346951","GSM346952","GSM346959","GSM346960","GSM347916","GSM347917","GSM347918","GSM347919","GSM347920","GSM347922","GSM347923","GSM347924","GSM347925","GSM349848","GSM349849","GSM350084","GSM350085","GSM350086","GSM359332","GSM359753","GSM359754","GSM359755","GSM359758","GSM359759","GSM359760","GSM361266","GSM361272","GSM361278","GSM361283","GSM361285","GSM366942","GSM367061","GSM367062","GSM367219","GSM367240","GSM367241","GSM367242","GSM367243","GSM367244","GSM367245","GSM367258","GSM372142","GSM372144","GSM372146","GSM372154","GSM372155","GSM372156","GSM372157","GSM372158","GSM372159","GSM372800","GSM372801","GSM372802","GSM372803","GSM372804","GSM372805","GSM372806","GSM372807","GSM372808","GSM372809","GSM372810","GSM372811","GSM372812","GSM372813","GSM372814","GSM372815","GSM372816","GSM372817","GSM372818","GSM378811","GSM381339","GSM381340","GSM381341","GSM381342","GSM381343","GSM381344","GSM381345","GSM381346","GSM385333","GSM385338","GSM385350","GSM385353","GSM402707","GSM402717","GSM402752","GSM402806","GSM410666","GSM410667","GSM410668","GSM410669","GSM410672","GSM410673","GSM410674","GSM410675","GSM410678","GSM410679","GSM410680","GSM410681","GSM410684","GSM410685","GSM410686","GSM410687","GSM413840","GSM413842","GSM413846","GSM413847","GSM413848","GSM419987","GSM419988","GSM419989","GSM419990","GSM419991","GSM419992","GSM422109","GSM422110","GSM422111","GSM422112","GSM422113","GSM422114","GSM422116","GSM432175","GSM432176","GSM432177","GSM432178","GSM432179","GSM432180","GSM451153","GSM451154","GSM451155","GSM451156","GSM451157","GSM451158","GSM451160","GSM451161","GSM456349","GSM456350","GSM456351","GSM466515","GSM466516","GSM466517","GSM466518","GSM466519","GSM469125","GSM469126","GSM469127","GSM469128","GSM469129","GSM469130","GSM469131","GSM469132","GSM469136","GSM469409","GSM469411","GSM469412","GSM476782","GSM476783","GSM476784","GSM476785","GSM476786","GSM483480","GSM483481","GSM483482","GSM483483","GSM483484","GSM483485","GSM488968","GSM488969","GSM488970","GSM488971","GSM488972","GSM488973","GSM488974","GSM488975","GSM488976","GSM488977","GSM488978","GSM488979","GSM488980","GSM488981","GSM488982","GSM488983","GSM492832","GSM492833","GSM492834","GSM492835","GSM500995","GSM500996","GSM500997","GSM500998","GSM500999","GSM501000","GSM501001","GSM501002","GSM501003","GSM501004","GSM501005","GSM501006","GSM501007","GSM501008","GSM501009","GSM501890","GSM501891","GSM501892","GSM501893","GSM501894","GSM501895","GSM514669","GSM514670","GSM514671","GSM514672","GSM530601","GSM530602","GSM530603","GSM530604","GSM530605","GSM530606","GSM530607","GSM530611","GSM53382","GSM53383","GSM53384","GSM53385","GSM53386","GSM53387","GSM540714","GSM540715","GSM540716","GSM542578","GSM547998","GSM547999","GSM548000","GSM548001","GSM549577","GSM549578","GSM549579","GSM549580","GSM549581","GSM549582","GSM549583","GSM549584","GSM551183","GSM556647","GSM556663","GSM556665","GSM92231","GSM92232","GSM92233","GSM92234"],["DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","B_cell","B_cell","B_cell","B_cell","Neutrophils","Neutrophils","Neutrophils","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","BM &amp; Prog.","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","DC","DC","DC","DC","DC","DC","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","Gametocytes","Gametocytes","DC","DC","DC","DC","Neurons","Neurons","Neurons","Neurons","Neurons","Neurons","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","NK_cell","NK_cell","NK_cell","NK_cell","Embryonic_stem_cells","Embryonic_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Chondrocytes","Chondrocytes","Chondrocytes","Osteoblasts","Osteoblasts","Osteoblasts","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","DC","DC","DC","DC","DC","DC","DC","DC","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","Smooth_muscle_cells","BM","BM","BM","BM","BM","BM","BM","Platelets","Platelets","Platelets","Platelets","Platelets","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Epithelial_cells","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Gametocytes","Gametocytes","Gametocytes","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","DC","DC","DC","DC","DC","DC","DC","DC","DC","DC","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Fibroblasts","Fibroblasts","Fibroblasts","Fibroblasts","Endothelial_cells","Endothelial_cells","Smooth_muscle_cells","Smooth_muscle_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","T_cells","T_cells","Monocyte","Monocyte","Monocyte","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Neutrophils","iPS_cells","Embryonic_stem_cells","Embryonic_stem_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","T_cells","Embryonic_stem_cells","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","B_cell","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Chondrocytes","Chondrocytes","Chondrocytes","Chondrocytes","Chondrocytes","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Macrophage","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","Hepatocytes","Hepatocytes","Hepatocytes","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Neutrophils","MSC","MSC","MSC","MSC","MSC","MSC","MSC","MSC","MSC","Neuroepithelial_cell","Astrocyte","Astrocyte","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","Endothelial_cells","HSC_CD34+","HSC_CD34+","HSC_CD34+","HSC_CD34+","HSC_CD34+","HSC_CD34+","CMP","CMP","GMP","GMP","B_cell","B_cell","MEP","MEP","Myelocyte","Myelocyte","Pre-B_cell_CD34-","Pre-B_cell_CD34-","Pro-B_cell_CD34+","Pro-B_cell_CD34+","Pro-Myelocyte","Pro-Myelocyte","Endothelial_cells","Endothelial_cells","Smooth_muscle_cells","Smooth_muscle_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","iPS_cells","Fibroblasts","Fibroblasts","Fibroblasts","Fibroblasts","Fibroblasts","Fibroblasts","Monocyte","Monocyte","Monocyte","Monocyte","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Neurons","Neurons","Neurons","Neurons","Neurons","Neurons","Tissue_stem_cells","Tissue_stem_cells","Tissue_stem_cells","NK_cell","T_cells","T_cells","T_cells","T_cells","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Neutrophils","Endothelial_cells","Monocyte","Monocyte","Monocyte","Neurons","Neurons","Neurons","Neurons"],["DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:Galectin-1","DC:monocyte-derived:Galectin-1","DC:monocyte-derived:Galectin-1","DC:monocyte-derived:LPS","DC:monocyte-derived:LPS","DC:monocyte-derived:LPS","DC:monocyte-derived","DC:monocyte-derived","DC:monocyte-derived","Smooth_muscle_cells:bronchial:vit_D","Smooth_muscle_cells:bronchial:vit_D","Smooth_muscle_cells:bronchial:vit_D","Smooth_muscle_cells:bronchial","Smooth_muscle_cells:bronchial","Smooth_muscle_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","Epithelial_cells:bronchial","B_cell","B_cell","B_cell","B_cell","Neutrophil","Neutrophil","Neutrophil","T_cell:CD8+_Central_memory","T_cell:CD8+_Central_memory","T_cell:CD8+_Central_memory","T_cell:CD8+","T_cell:CD4+","T_cell:CD8+","T_cell:CD4+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD4+","T_cell:CD8+","T_cell:CD8+_effector_memory_RA","T_cell:CD8+_effector_memory_RA","T_cell:CD8+_effector_memory_RA","T_cell:CD8+_effector_memory_RA","T_cell:CD8+_effector_memory","T_cell:CD8+_effector_memory","T_cell:CD8+_effector_memory","T_cell:CD8+_effector_memory","T_cell:CD8+_naive","T_cell:CD8+_naive","T_cell:CD8+_naive","T_cell:CD8+_naive","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","Erythroblast","BM","DC:monocyte-derived","DC:monocyte-derived:rosiglitazone","DC:monocyte-derived:AM580","DC:monocyte-derived","DC:monocyte-derived:rosiglitazone","DC:monocyte-derived:AM580","DC:monocyte-derived:rosiglitazone/AGN193109","DC:monocyte-derived","DC:monocyte-derived:rosiglitazone","DC:monocyte-derived:AM580","DC:monocyte-derived:rosiglitazone/AGN193109","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","DC:monocyte-derived","DC:monocyte-derived","DC:monocyte-derived","DC:monocyte-derived:anti-DC-SIGN_2h","DC:monocyte-derived:anti-DC-SIGN_2h","DC:monocyte-derived:anti-DC-SIGN_2h","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:Borrelia_burgdorferi","Endothelial_cells:HUVEC:Borrelia_burgdorferi","Endothelial_cells:HUVEC:IFNg","Endothelial_cells:lymphatic","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:Serum_Amyloid_A","Endothelial_cells:HUVEC:Serum_Amyloid_A","Endothelial_cells:HUVEC:Serum_Amyloid_A","Endothelial_cells:HUVEC:Serum_Amyloid_A","Endothelial_cells:HUVEC:Serum_Amyloid_A","Endothelial_cells:HUVEC:Serum_Amyloid_A","Endothelial_cells:lymphatic","Endothelial_cells:lymphatic","Endothelial_cells:lymphatic:TNFa_48h","Endothelial_cells:lymphatic:TNFa_48h","Endothelial_cells:lymphatic:TNFa_48h","T_cell:effector","T_cell:effector","T_cell:effector","T_cell:effector","T_cell:CCR10+CLA+1,25(OH)2_vit_D3/IL-12","T_cell:CCR10-CLA+1,25(OH)2_vit_D3/IL-12","Gametocytes:spermatocyte","Gametocytes:spermatocyte","DC:monocyte-derived","DC:monocyte-derived:A._fumigatus_germ_tubes_6h","DC:monocyte-derived","DC:monocyte-derived:A._fumigatus_germ_tubes_6h","Neurons:ES_cell-derived_neural_precursor","Neurons:ES_cell-derived_neural_precursor","Neurons:ES_cell-derived_neural_precursor","Neurons:ES_cell-derived_neural_precursor","Neurons:ES_cell-derived_neural_precursor","Neurons:ES_cell-derived_neural_precursor","Keratinocytes","Keratinocytes","Keratinocytes","Keratinocytes:IL19","Keratinocytes:IL19","Keratinocytes:IL19","Keratinocytes:IL20","Keratinocytes:IL20","Keratinocytes:IL20","Keratinocytes:IL22","Keratinocytes:IL22","Keratinocytes:IL22","Keratinocytes:IL24","Keratinocytes:IL24","Keratinocytes:IL24","Keratinocytes:IL26","Keratinocytes:IL26","Keratinocytes:IL26","Keratinocytes:KGF","Keratinocytes:KGF","Keratinocytes:KGF","Keratinocytes:IFNg","Keratinocytes:IFNg","Keratinocytes:IL1b","Keratinocytes:IL1b","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","HSC_-G-CSF","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:mature","DC:monocyte-derived:immature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","Monocyte","Monocyte:anti-FcgRIIB","Monocyte","Monocyte","Monocyte:anti-FcgRIIB","Macrophage:monocyte-derived:IL-4/cntrl","Macrophage:monocyte-derived:IL-4/cntrl","Macrophage:monocyte-derived:IL-4/cntrl","Macrophage:monocyte-derived:IL-4/cntrl","Macrophage:monocyte-derived:IL-4/cntrl","Macrophage:monocyte-derived:IL-4/Dex/cntrl","Macrophage:monocyte-derived:IL-4/Dex/cntrl","Macrophage:monocyte-derived:IL-4/Dex/cntrl","Macrophage:monocyte-derived:IL-4/Dex/cntrl","Macrophage:monocyte-derived:IL-4/Dex/cntrl","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/Dex/TGFb","Macrophage:monocyte-derived:IL-4/TGFb","Macrophage:monocyte-derived:IL-4/TGFb","Macrophage:monocyte-derived:IL-4/TGFb","Macrophage:monocyte-derived:IL-4/TGFb","Macrophage:monocyte-derived:IL-4/TGFb","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte:leukotriene_D4","Monocyte:leukotriene_D4","Monocyte:leukotriene_D4","Monocyte:leukotriene_D4","NK_cell","NK_cell:IL2","NK_cell:IL2","NK_cell:IL2","Embryonic_stem_cells","Embryonic_stem_cells","Tissue_stem_cells:iliac_MSC","Tissue_stem_cells:iliac_MSC","Tissue_stem_cells:iliac_MSC","Chondrocytes:MSC-derived","Chondrocytes:MSC-derived","Chondrocytes:MSC-derived","Osteoblasts","Osteoblasts","Osteoblasts","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts:BMP2","Osteoblasts:BMP2","Osteoblasts:BMP2","Osteoblasts","Osteoblasts","Osteoblasts","Osteoblasts:BMP2","Osteoblasts:BMP2","Osteoblasts:BMP2","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:BMP2","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","Tissue_stem_cells:BM_MSC:TGFb3","DC:monocyte-derived","DC:monocyte-derived:LPS","DC:monocyte-derived:LPS","DC:monocyte-derived:LPS","DC:monocyte-derived:Poly(IC)","DC:monocyte-derived:Poly(IC)","DC:monocyte-derived:Poly(IC)","DC:monocyte-derived:CD40L","DC:monocyte-derived:CD40L","DC:monocyte-derived:CD40L","DC:monocyte-derived:Schuler_treatment","DC:monocyte-derived:Schuler_treatment","DC:monocyte-derived:Schuler_treatment","DC:monocyte-derived","DC:monocyte-derived","DC:monocyte-derived:antiCD40/VAF347","DC:monocyte-derived:antiCD40/VAF347","Tissue_stem_cells:dental_pulp","Tissue_stem_cells:dental_pulp","Tissue_stem_cells:dental_pulp","Tissue_stem_cells:dental_pulp","Tissue_stem_cells:dental_pulp","Tissue_stem_cells:dental_pulp","T_cell:CD4+_central_memory","T_cell:CD4+_central_memory","T_cell:CD4+_central_memory","T_cell:CD4+_central_memory","T_cell:CD4+_central_memory","T_cell:CD4+_effector_memory","T_cell:CD4+_effector_memory","T_cell:CD4+_effector_memory","T_cell:CD4+_effector_memory","T_cell:CD4+_Naive","T_cell:CD4+_Naive","T_cell:CD4+_Naive","T_cell:CD4+_Naive","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:mature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","DC:monocyte-derived:immature","Smooth_muscle_cells:vascular","Smooth_muscle_cells:vascular:IL-17","Smooth_muscle_cells:vascular","Smooth_muscle_cells:vascular:IL-17","Smooth_muscle_cells:vascular","Smooth_muscle_cells:vascular:IL-17","BM","BM","BM","BM","BM","BM","BM","Platelets","Platelets","Platelets","Platelets","Platelets","Epithelial_cells:bladder","Epithelial_cells:bladder","Epithelial_cells:bladder","Epithelial_cells:bladder","Epithelial_cells:bladder","Epithelial_cells:bladder","Macrophage:monocyte-derived","Macrophage:monocyte-derived:M-CSF","Macrophage:monocyte-derived:M-CSF/IFNg","Macrophage:monocyte-derived:M-CSF/Pam3Cys","Macrophage:monocyte-derived:M-CSF/IFNg/Pam3Cys","Macrophage:monocyte-derived","Macrophage:monocyte-derived:M-CSF","Macrophage:monocyte-derived:M-CSF/IFNg","Macrophage:monocyte-derived:M-CSF/Pam3Cys","Macrophage:monocyte-derived:M-CSF/IFNg/Pam3Cys","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Gametocytes:oocyte","Gametocytes:oocyte","Gametocytes:oocyte","Monocyte","Monocyte","Monocyte:F._tularensis_novicida","Monocyte","Monocyte:F._tularensis_novicida","Monocyte","Monocyte:F._tularensis_novicida","Monocyte","Monocyte:F._tularensis_novicida","Monocyte","Monocyte:F._tularensis_novicida","Monocyte:F._tularensis_novicida","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:B._anthracis_LT","Endothelial_cells:HUVEC:B._anthracis_LT","B_cell:Germinal_center","B_cell:Germinal_center","B_cell:Germinal_center","B_cell:Plasma_cell","B_cell:Plasma_cell","B_cell:Plasma_cell","B_cell:Naive","B_cell:Naive","B_cell:Naive","B_cell:Memory","B_cell:Memory","B_cell:Memory","DC:monocyte-derived","DC:monocyte-derived:AEC-conditioned","DC:monocyte-derived","DC:monocyte-derived:AEC-conditioned","DC:monocyte-derived","DC:monocyte-derived:AEC-conditioned","DC:monocyte-derived","DC:monocyte-derived:AEC-conditioned","DC:monocyte-derived","DC:monocyte-derived:AEC-conditioned","Tissue_stem_cells:lipoma-derived_MSC","Tissue_stem_cells:lipoma-derived_MSC","Tissue_stem_cells:adipose-derived_MSC_AM3","Tissue_stem_cells:adipose-derived_MSC_AM3","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:FPV-infected","Endothelial_cells:HUVEC:PR8-infected","Endothelial_cells:HUVEC:H5N1-infected","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:FPV-infected","Endothelial_cells:HUVEC:PR8-infected","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:FPV-infected","Endothelial_cells:HUVEC:PR8-infected","Endothelial_cells:HUVEC:H5N1-infected","Endothelial_cells:HUVEC:H5N1-infected","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Macrophage:monocyte-derived","Macrophage:monocyte-derived:S._aureus","Fibroblasts:foreskin","Fibroblasts:foreskin","Fibroblasts:foreskin","Fibroblasts:foreskin","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC","Smooth_muscle_cells:vascular","Smooth_muscle_cells:vascular","iPS_cells:skin_fibroblast-derived","iPS_cells:skin_fibroblast-derived","iPS_cells:skin_fibroblast-derived","iPS_cells:skin_fibroblast","iPS_cells:skin_fibroblast","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","T_cell:gamma-delta","T_cell:gamma-delta","Monocyte:CD14+","Monocyte:CD14+","Monocyte:CD14+","Macrophage:Alveolar","Macrophage:Alveolar","Macrophage:Alveolar","Macrophage:Alveolar","Macrophage:Alveolar:B._anthacis_spores","Macrophage:Alveolar:B._anthacis_spores","Macrophage:Alveolar:B._anthacis_spores","Neutrophil","Neutrophil:inflam","Neutrophil:inflam","Neutrophil:inflam","Neutrophil:inflam","iPS_cells:PDB_fibroblasts","Embryonic_stem_cells","Embryonic_stem_cells","iPS_cells:PDB_1lox-17Puro-5","iPS_cells:PDB_1lox-17Puro-10","iPS_cells:PDB_1lox-21Puro-20","iPS_cells:PDB_1lox-21Puro-26","iPS_cells:PDB_2lox-5","iPS_cells:PDB_2lox-22","iPS_cells:PDB_2lox-21","iPS_cells:PDB_2lox-17","iPS_cells:CRL2097_foreskin","iPS_cells:CRL2097_foreskin","iPS_cells:CRL2097_foreskin","iPS_cells:CRL2097_foreskin-derived:d20_hepatic_diff","iPS_cells:CRL2097_foreskin-derived:d20_hepatic_diff","iPS_cells:CRL2097_foreskin-derived:d20_hepatic_diff","iPS_cells:CRL2097_foreskin-derived:undiff.","iPS_cells:CRL2097_foreskin-derived:undiff.","iPS_cells:CRL2097_foreskin-derived:undiff.","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD4+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","T_cell:CD8+","Embryonic_stem_cells","B_cell:CXCR4+_centroblast","B_cell:CXCR4-_centrocyte","B_cell:CXCR4+_centroblast","B_cell:CXCR4-_centrocyte","B_cell:CXCR4+_centroblast","B_cell:CXCR4-_centrocyte","B_cell:CXCR4+_centroblast","B_cell:CXCR4-_centrocyte","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:VEGF","Endothelial_cells:HUVEC:VEGF","Endothelial_cells:HUVEC:VEGF","iPS_cells:fibroblasts","iPS_cells:fibroblast-derived:Direct_del._reprog","iPS_cells:fibroblast-derived:Direct_del._reprog","iPS_cells:fibroblast-derived:Retroviral_transf","Endothelial_cells:lymphatic","Endothelial_cells:lymphatic","Endothelial_cells:lymphatic","Endothelial_cells:lymphatic","Endothelial_cells:lymphatic:KSHV","Endothelial_cells:lymphatic:KSHV","Endothelial_cells:lymphatic:KSHV","Endothelial_cells:lymphatic:KSHV","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Endothelial_cells:blood_vessel","Chondrocytes:MSC-derived","Chondrocytes:MSC-derived","Chondrocytes:MSC-derived","Chondrocytes:MSC-derived","Chondrocytes:MSC-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Macrophage:monocyte-derived:IFNa","Monocyte:CD16-","Monocyte:CD16-","Monocyte:CD16-","Monocyte:CD16-","Monocyte:CD16+","Monocyte:CD16+","Monocyte:CD16+","Monocyte:CD16-","Monocyte:CD16-","Monocyte:CD16-","Monocyte:CD16+","Monocyte:CD16+","Monocyte:CD16+","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Tissue_stem_cells:BM_MSC:osteogenic","Hepatocytes","Hepatocytes","Hepatocytes","Neutrophil:uropathogenic_E._coli_UTI89","Neutrophil:commensal_E._coli_MG1655","Neutrophil:commensal_E._coli_MG1655","Neutrophil","Neutrophil","MSC","MSC","MSC","MSC","MSC","MSC","MSC","MSC","MSC","Neuroepithelial_cell:ESC-derived","Astrocyte:Embryonic_stem_cell-derived","Astrocyte:Embryonic_stem_cell-derived","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:IL-1b","Endothelial_cells:HUVEC:IL-1b","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC:IL-1b","HSC_CD34+","HSC_CD34+","HSC_CD34+","HSC_CD34+","HSC_CD34+","HSC_CD34+","CMP","CMP","GMP","GMP","B_cell:immature","B_cell:immature","MEP","MEP","Myelocyte","Myelocyte","Pre-B_cell_CD34-","Pre-B_cell_CD34-","Pro-B_cell_CD34+","Pro-B_cell_CD34+","Pro-Myelocyte","Pro-Myelocyte","Endothelial_cells:HUVEC","Endothelial_cells:HUVEC","Smooth_muscle_cells:umbilical_vein","Smooth_muscle_cells:umbilical_vein","iPS_cells:foreskin_fibrobasts","iPS_cells:iPS:minicircle-derived","iPS_cells:iPS:minicircle-derived","iPS_cells:iPS:minicircle-derived","iPS_cells:iPS:minicircle-derived","iPS_cells:iPS:minicircle-derived","iPS_cells:adipose_stem_cells","iPS_cells:adipose_stem_cells","iPS_cells:adipose_stem_cells","iPS_cells:adipose_stem_cell-derived:lentiviral","iPS_cells:adipose_stem_cell-derived:lentiviral","iPS_cells:adipose_stem_cell-derived:lentiviral","iPS_cells:adipose_stem_cell-derived:minicircle-derived","iPS_cells:adipose_stem_cell-derived:minicircle-derived","iPS_cells:adipose_stem_cell-derived:minicircle-derived","Fibroblasts:breast","Fibroblasts:breast","Fibroblasts:breast","Fibroblasts:breast","Fibroblasts:breast","Fibroblasts:breast","Monocyte:MCSF","Monocyte:MCSF","Monocyte:CXCL4","Monocyte:CXCL4","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Embryonic_stem_cells","Neurons:adrenal_medulla_cell_line","Neurons:adrenal_medulla_cell_line","Neurons:adrenal_medulla_cell_line","Neurons:adrenal_medulla_cell_line","Neurons:adrenal_medulla_cell_line","Neurons:adrenal_medulla_cell_line","Tissue_stem_cells:CD326-CD56+","Tissue_stem_cells:CD326-CD56+","Tissue_stem_cells:CD326-CD56+","NK_cell:CD56hiCD62L+","T_cell:Treg:Naive","T_cell:Treg:Naive","T_cell:CD4+_Naive","T_cell:CD4+_Naive","Neutrophil:LPS","Neutrophil:LPS","Neutrophil:LPS","Neutrophil:LPS","Neutrophil:GM-CSF_IFNg","Neutrophil:GM-CSF_IFNg","Neutrophil:GM-CSF_IFNg","Neutrophil:GM-CSF_IFNg","Endothelial_cells:HUVEC","Monocyte","Monocyte","Monocyte:S._typhimurium_flagellin","Neurons:Schwann_cell","Neurons:Schwann_cell","Neurons:Schwann_cell","Neurons:Schwann_cell"],["CL:0000840","CL:0000840","CL:0000840","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0002598","CL:0002598","CL:0002598","CL:0002598","CL:0002598","CL:0002598","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0002328","CL:0000236","CL:0000236","CL:0000236","CL:0000236","CL:0000775","CL:0000775","CL:0000775","CL:0000907","CL:0000907","CL:0000907","CL:0000625","CL:0000624","CL:0000625","CL:0000624","CL:0000625","CL:0000625","CL:0000625","CL:0000624","CL:0000625","CL:0001062","CL:0001062","CL:0001062","CL:0001062","CL:0000913","CL:0000913","CL:0000913","CL:0000913","CL:0000900","CL:0000900","CL:0000900","CL:0000900","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000765","CL:0000765","CL:0000765","CL:0000765","CL:0000765","CL:0000765","CL:0000765","CL:0000765",null,"CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002138","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0000911","CL:0000911","CL:0000911","CL:0000911","CL:0000084","CL:0000084","CL:0000017","CL:0000017","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000031","CL:0000031","CL:0000031","CL:0000031","CL:0000031","CL:0000031","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000312","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000841","CL:0000840","CL:0000841","CL:0000841","CL:0000841","CL:0000841","CL:0000841","CL:0000841","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000623","CL:0000623","CL:0000623","CL:0000623","CL:0002322","CL:0002322","CL:0000134","CL:0000134","CL:0000134","CL:0000138","CL:0000138","CL:0000138","CL:0000062","CL:0000062","CL:0000062","CL:0000134","CL:0000134","CL:0000134","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000062","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0002148","CL:0002148","CL:0002148","CL:0002148","CL:0002148","CL:0002148","CL:0000904","CL:0000904","CL:0000904","CL:0000904","CL:0000904","CL:0000905","CL:0000905","CL:0000905","CL:0000905","CL:0000895","CL:0000895","CL:0000895","CL:0000895","CL:0000841","CL:0000841","CL:0000841","CL:0000841","CL:0000840","CL:0000840","CL:0000840","CL:0000840","CL:0000359","CL:0000359","CL:0000359","CL:0000359","CL:0000359","CL:0000359",null,null,null,null,null,null,null,"CL:0000233","CL:0000233","CL:0000233","CL:0000233","CL:0000233","CL:0000066","CL:0000066","CL:0000066","CL:0000066","CL:0000066","CL:0000066","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000023","CL:0000023","CL:0000023","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0000844","CL:0000844","CL:0000844","CL:0000786","CL:0000786","CL:0000786","CL:0000788","CL:0000788","CL:0000788","CL:0000787","CL:0000787","CL:0000787","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000451","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:1001608","CL:1001608","CL:1001608","CL:1001608","CL:0002618","CL:0002618","CL:0000359","CL:0000359",null,null,null,null,null,"CL:0002322","CL:0002322","CL:0002322","CL:0002322","CL:0000798","CL:0000798","CL:0001054","CL:0001054","CL:0001054","CL:0000583","CL:0000583","CL:0000583","CL:0000583","CL:0000583","CL:0000583","CL:0000583","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000775",null,"CL:0002322","CL:0002322",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"CL:0000624","CL:0000624","CL:0000624","CL:0000624","CL:0000624","CL:0000624","CL:0000624","CL:0000624","CL:0000624","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0000625","CL:0002322","CL:0000965","CL:0000966","CL:0000965","CL:0000966","CL:0000965","CL:0000966","CL:0000965","CL:0000966","CL:0002618","CL:0002618","CL:0002618","CL:0002618",null,null,null,null,"CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0002138","CL:0000071","CL:0000071","CL:0000071","CL:0000071","CL:0000071","CL:0000071","CL:0000071","CL:0000071","CL:0000138","CL:0000138","CL:0000138","CL:0000138","CL:0000138","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000235","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000182","CL:0000182","CL:0000182","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0000134","CL:0002259","CL:0000127","CL:0000127","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0002618","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000037","CL:0000049","CL:0000049","CL:0000557","CL:0000557","CL:0000816","CL:0000816","CL:0000050","CL:0000050","CL:0002193","CL:0002193","CL:0000955","CL:0000955","CL:0002048","CL:0002048","CL:0000836","CL:0000836","CL:0002618","CL:0002618","CL:0002588","CL:0002588",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"CL:0002555","CL:0002555","CL:0002555","CL:0002555","CL:0002555","CL:0002555","CL:0000576","CL:0000576","CL:0000576","CL:0000576","CL:0002322","CL:0002322","CL:0002322","CL:0002322","CL:0002322","CL:0002322","CL:0002322","CL:0002322","CL:0000540","CL:0000540","CL:0000540","CL:0000540","CL:0000540","CL:0000540","CL:0000222","CL:0000222","CL:0000222","CL:0000623","CL:0002677","CL:0002677","CL:0000895","CL:0000895","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0000775","CL:0002618","CL:0000576","CL:0000576","CL:0000576","CL:0002573","CL:0002573","CL:0002573","CL:0002573"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>label.main<\/th>\n      <th>label.fine<\/th>\n      <th>label.ont<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false,"orderCellsTop":true},"selection":{"mode":"multiple","selected":null,"target":"row","selectable":null}},"evals":[],"jsHooks":[]}</script>
+<p>The prediction of cell label was performed using the
+<code>SingleR()</code> function with the log-normed matrix as input for
+the test dataset. Since this is an unbiased cell type annotation
+analysis, all cell types were included in the reference datasetg.</p>
+<pre class="r"><code>seurat_count &lt;- GetAssayData(object = fibroblast, slot = &#39;data&#39;)
+# pred_hpca &lt;- SingleR(
+#     test = as.matrix(seurat_count), ref = hpca.se, labels = hpca.se$label.main
+# )
+# saveRDS(pred_hpca, here::here(&quot;output/pred_hpca.rds&quot;))
+pred_hpca &lt;- readRDS(here::here(&quot;output/pred_hpca.rds&quot;))</code></pre>
+<p>Results of the prediction was visualised as a bar plot:</p>
+<pre class="r"><code>pred_hpca &lt;- pred_hpca %&gt;%
+    as.data.frame() %&gt;%
+    rownames_to_column(&quot;cell&quot;) %&gt;%
+    left_join(
+        fibroblast[[]] %&gt;%
+    rownames_to_column(&quot;cell&quot;) 
+    ) 
+hpca_temp &lt;- pred_hpca %&gt;%
+    with(
+        ., table(patient, pruned.labels)
+    ) %&gt;%
+    prop.table(margin = 1) %&gt;%
+    as.data.frame() %&gt;%
+    group_by(pruned.labels) %&gt;%
+    mutate(
+        mean_freq = mean(Freq), 
+        pruned.labels = str_replace_all(pruned.labels, &quot;_&quot;, &quot; &quot;)) %&gt;%
+    .[order(.$mean_freq, decreasing = TRUE),] %&gt;%
+    dplyr::filter(Freq &gt; 0.0015) 
+predBar_hpca &lt;- hpca_temp %&gt;%
+    ggplot(
+        aes(factor(pruned.labels, levels = unique(hpca_temp$pruned.labels)), Freq, fill = patient)
+    ) +
+    geom_bar(stat=&quot;identity&quot;, position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust=-0.5, 
+              position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = &quot;&quot;,
+         y = &quot;Number of Cells&quot;) +
+    theme(
+        text = element_text(size = 18)
+    ) +
+    scale_fill_manual(values = patient_col, name = &quot;Patient&quot;)
+predBar_hpca</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/Subtype_Prediction.Rmd/unnamed-chunk-6-1.png" alt="*SingleR cell-type prediction results derived using the Human Primary Cell Atlas as a reference. The dominant cell type was fibroblast with mesenchymal stem cells and smooth muscle cells being 2nd and 3rd most abundant ones.*" width="1152" />
+<p class="caption">
+<em>SingleR cell-type prediction results derived using the Human Primary
+Cell Atlas as a reference. The dominant cell type was fibroblast with
+mesenchymal stem cells and smooth muscle cells being 2nd and 3rd most
+abundant ones.</em>
+</p>
+</div>
+</div>
+<div id="use-data-from-wu-et-al.-2020-as-reference"
+class="section level1">
+<h1>Use data from Wu, et al. 2020 as reference</h1>
+<p>In the study published by <a
+href="https://pubmed.ncbi.nlm.nih.gov/32790115/">Wu et al. 2020</a>, two
+cancer-associated fibroblast (CAF) and two perivascular-like (PVL)
+subpopulations were defined from the single-cell RNA sequencing data of
+five TNBCs cased. The log-normed count matrix and cell metadata of that
+dataset was downloaded from the <a
+href="https://singlecell.broadinstitute.org/single_cell/study/SCP1106/stromal-cell-diversity-associated-with-immune-evasion-in-human-triple-negative-breast-cancer#study-download">Broad
+Single Cell Portal</a>.</p>
+<p>Since the scRNA-seq was performed on primary breast tumours using a
+marer-free approach, there were also epithelial and immune-related cells
+in this dataset. The numbers of cells in each annotaed cell type
+were:</p>
+<pre class="r"><code>wu_cellMeta &lt;- read_csv(here::here(&quot;data/Wu_2020/Wu_EMBO_metadata.csv&quot;))
+wu_cellMeta &lt;- wu_cellMeta[-1,]
+wu_normCount &lt;- read_csv(here::here(&quot;data/Wu_2020/Wu_EMBO_countr_matrix.csv&quot;))
+wu_normCount &lt;- wu_normCount %&gt;%
+    column_to_rownames(&quot;...1&quot;)
+wu_cellType &lt;- wu_cellMeta %&gt;%
+    .[match(.$NAME, colnames(wu_normCount)),] %&gt;%
+    pull(celltype_final)
+wu_cellMeta %&gt;%
+    group_by(celltype_final) %&gt;%
+    summarise(n = n()) %&gt;%
+    .[order(.$n, decreasing = TRUE), ] %&gt;%
+    mutate(celltype_final = as.factor(celltype_final)) %&gt;%
+    datatable(
+        filter = &quot;top&quot;
+    )</code></pre>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-b0a3eb95307bf6230077" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-b0a3eb95307bf6230077">{"x":{"filter":"top","vertical":false,"filterHTML":"<tr>\n  <td><\/td>\n  <td data-type=\"factor\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"width: 100%; display: none;\">\n      <select multiple=\"multiple\" style=\"width: 100%;\" data-options=\"[&quot;B_Cells&quot;,&quot;CD4+ T-cells&quot;,&quot;CD8+ T-cells&quot;,&quot;dPVL&quot;,&quot;Endothelial&quot;,&quot;Epithelial_Basal&quot;,&quot;Epithelial_Basal_Cycling&quot;,&quot;Epithelial_Luminal_Mature&quot;,&quot;iCAFs&quot;,&quot;imPVL&quot;,&quot;myCAFs&quot;,&quot;Myeloid&quot;,&quot;Myoepithelial&quot;,&quot;NK cells&quot;,&quot;NKT cells&quot;,&quot;Plasma_Cells&quot;,&quot;T_cells_unassigned&quot;,&quot;T-cells Cycling&quot;,&quot;T-Regs&quot;,&quot;Tfh cells&quot;]\"><\/select>\n    <\/div>\n  <\/td>\n  <td data-type=\"integer\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none;position: absolute;width: 200px;opacity: 1\">\n      <div data-min=\"106\" data-max=\"4606\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20"],["Myeloid","Epithelial_Basal","CD8+ T-cells","CD4+ T-cells","Plasma_Cells","B_Cells","iCAFs","T-Regs","T_cells_unassigned","Epithelial_Basal_Cycling","Endothelial","T-cells Cycling","NK cells","myCAFs","Epithelial_Luminal_Mature","dPVL","Myoepithelial","Tfh cells","NKT cells","imPVL"],[4606,4095,3691,2003,1955,1245,1129,994,938,614,610,605,358,280,277,214,212,175,164,106]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>celltype_final<\/th>\n      <th>n<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":2},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false,"orderCellsTop":true},"selection":{"mode":"multiple","selected":null,"target":"row","selectable":null}},"evals":[],"jsHooks":[]}</script>
+<p>The prediction of cell type was performed using <code>SingleR</code>
+again, and the results were visualised as a barplot.</p>
+<pre class="r"><code># pred_wu &lt;- SingleR(
+#     test = as.matrix(seurat_count), ref = wu_normCount, labels = wu_cellType,
+#     de.method = &quot;wilcox&quot;
+# )
+# saveRDS(pred_wu, here::here(&quot;output/pred_wu.rds&quot;))
+pred_wu &lt;- readRDS(here::here(&quot;output/pred_wu.rds&quot;))</code></pre>
+<pre class="r"><code>pred_wu &lt;- pred_wu %&gt;%
+    as.data.frame() %&gt;%
+    rownames_to_column(&quot;cell&quot;) %&gt;%
+    left_join(
+        fibroblast[[]] %&gt;%
+    rownames_to_column(&quot;cell&quot;) 
+    ) 
+wu_temp &lt;- pred_wu %&gt;%
+    with(
+        ., table(patient, pruned.labels)
+    ) %&gt;%
+    prop.table(margin = 1) %&gt;%
+    as.data.frame() %&gt;%
+            dplyr::filter(Freq &gt; 0.0015) %&gt;%
+    mutate(
+        pruned.labels = str_replace_all(pruned.labels, &quot;_&quot;, &quot; &quot;))
+predBar_wu &lt;- wu_temp %&gt;%
+    ggplot(
+        aes(pruned.labels, Freq, fill = patient)
+    ) +
+    geom_bar(stat=&quot;identity&quot;, position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust= 0, 
+              position = position_dodge(0.9), size=10) +
+    theme_minimal() +
+    labs(x = &quot;&quot;,
+         y = &quot;Number of Cells&quot;) +
+    theme(
+        text = element_text(size = 30)
+    ) +
+    scale_fill_manual(values = patient_col, name = &quot;Patient&quot;)
+predBar_wu</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/Subtype_Prediction.Rmd/unnamed-chunk-9-1.png" alt="*SingleR cell-type prediction results derived using scRNA-seq fibroblast data derived from Wu et. al 2020. Basically all cells were predicted to be myCAFs.*" width="1152" />
+<p class="caption">
+<em>SingleR cell-type prediction results derived using scRNA-seq
+fibroblast data derived from Wu et. al 2020. Basically all cells were
+predicted to be myCAFs.</em>
+</p>
+</div>
+<p>In the original study, the. myofibroblast-like CAFs (myCAFs) were
+classified by the expression of fibroblast-specific markers (PDGFRA,
+COL1A1, FAP and PDPN) + elevated expression of activated fibroblast
+markers (ACTA2, FAP and PDPN) and collagen-related genes (COL1A1 and
+COL1A2).</p>
+<pre class="r"><code>fibroblast$hpca_pred &lt;- pred_hpca %&gt;%
+    .[match(rownames(fibroblast[[]]), pred_hpca$cell),] %&gt;%
+    droplevels() %&gt;%
+    pull(pruned.labels) 
+fibroblast$hpca_pred &lt;- replace_na(fibroblast$hpca_pred, &quot;Not labelled&quot;)
+p1 &lt;- DimPlot(fibroblast, 
+        reduction = &quot;umap&quot;, 
+        group.by = &quot;hpca_pred&quot;, 
+        pt.size = 0.3
+        ) +
+    ggtitle(&quot;&quot;) +
+    scale_color_discrete_qualitative()
+fibroblast$CAF_pred &lt;- pred_wu  %&gt;%
+    .[match(rownames(fibroblast[[]]), pred_wu$cell),] %&gt;%
+    droplevels() %&gt;%
+    pull(pruned.labels) 
+fibroblast$CAF_pred  &lt;- replace_na(fibroblast$CAF_pred , &quot;Not labelled&quot;)
+p2 &lt;- DimPlot(fibroblast, 
+        reduction = &quot;umap&quot;, 
+        group.by = &quot;CAF_pred&quot;, 
+        pt.size = 0.3
+        ) +
+    ggtitle(&quot;&quot;) +
+    scale_color_discrete_qualitative(palette = &quot;Set 3&quot;)
+fibroblast$label_check  &lt;- ifelse(
+    fibroblast$hpca_pred == &quot;MSC&quot; &amp; fibroblast$CAF_pred == &quot;Epithelial_Basal_Cycling&quot;, TRUE, FALSE
+)
+p3 &lt;- DimPlot(fibroblast, 
+        reduction = &quot;umap&quot;, 
+        group.by = &quot;label_check&quot;, 
+        pt.size = 0.3
+        ) +
+    ggtitle(&quot;&quot;) +
+    scale_color_manual(
+        values = c(
+            &quot;TRUE&quot; = &quot;red&quot;, 
+            &quot;FALSE&quot; = &quot;gray&quot;
+        ), 
+        name = &quot;Classified as both\nMSC &amp; basal&quot;
+    )
+p4 &lt;- fibroblast[[]] %&gt;%
+    with(
+        ., table(cluster, label_check)
+    ) %&gt;%
+    as.data.frame() %&gt;%
+    ggplot(
+        aes(cluster, Freq, fill = label_check)
+    ) +
+    geom_bar(stat=&quot;identity&quot;, position=position_dodge()) +
+    # geom_text(aes(label=n), vjust=1.6, color=&quot;white&quot;,
+    #           position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = &quot;Cluster&quot;,
+         y = &quot;Number of Cells&quot;) +
+    scale_fill_manual(
+        values = c(
+            &quot;TRUE&quot; = &quot;red&quot;, 
+            &quot;FALSE&quot; = &quot;gray&quot;
+        )
+    ) +
+    theme(
+        panel.grid = element_blank(), 
+        axis.text.x = element_text(size = 12),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,10,-10,-10)
+    )
+p1 + p2 + p3 + p4</code></pre>
+<p><img src="figure/Subtype_Prediction.Rmd/unnamed-chunk-10-1.png" width="1152" style="display: block; margin: auto;" /></p>
+</div>
+<div id="thesis-figure" class="section level1">
+<h1>Thesis figure</h1>
+<pre class="r"><code># Figure 4
+predBar_hpca &lt;- hpca_temp %&gt;%
+    ggplot(
+        aes(factor(pruned.labels, levels = unique(temp$pruned.labels)), Freq, fill = patient)
+    ) +
+    geom_bar(stat=&quot;identity&quot;, position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust=-0.2, 
+              position = position_dodge(0.9), size=15) +
+    theme_minimal() +
+    labs(x = &quot;&quot;,
+         y = &quot;Number of Cells&quot;) +
+    scale_fill_manual(values = patient_col, name = &quot;Patient&quot;)
+predBar_wu &lt;- wu_temp %&gt;%
+    ggplot(
+        aes(pruned.labels, Freq, fill = patient)
+    ) +
+    geom_bar(stat=&quot;identity&quot;, position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust= -0.2, 
+              position = position_dodge(0.9), size=15) +
+    theme_minimal() +
+    labs(x = &quot;&quot;,
+         y = &quot;Number of Cells&quot;) +
+    theme(
+        text = element_text(size = 30)
+    ) +
+    scale_fill_manual(values = patient_col, name = &quot;Patient&quot;)
+chap5_fig4 &lt;- (predBar_hpca / predBar_wu) +
+    plot_layout(guides = &#39;collect&#39;) +
+    plot_annotation(
+        tag_levels = &quot;A&quot;
+    ) &amp; 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = &quot;bold&quot; ), 
+        legend.key.size = unit(2, &quot;cm&quot;)
+    )
+# png(
+#     &quot;/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig4.png&quot;,
+#     height = 2000,
+#     width = 2800)
+# chap5_fig4
+# dev.off()</code></pre>
+<pre class="r"><code>chap5_fig5 &lt;- (p1 / p2 / p3) +
+    plot_annotation(
+        tag_levels = &quot;A&quot;
+    ) &amp; 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = &quot;bold&quot; ), 
+        legend.key.size = unit(2, &quot;cm&quot;)
+    )
+# png(
+#     &quot;/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig5.png&quot;,
+#     height = 1800,
+#     width = 1300)
+# chap5_fig5
+# dev.off()</code></pre>
+<pre class="r"><code>library(knitr)
+library(kableExtra)
+temp &lt;- table(colData(hpca.se)$label.main) %&gt;%
+   enframe(
+       name = &quot;HPCA cell type&quot;, 
+       value = &quot;Number of reference data&quot;
+   ) %&gt;%
+    mutate(
+        `HPCA cell type` = str_replace_all(`HPCA cell type`, &quot;_&quot;, &quot; &quot;)
+    ) %&gt;%
+    .[order(.$`Number of reference data`, decreasing = TRUE),]
+temp %&gt;%
+    xtable::xtable(
+        caption = &quot;Numbers of reference microarray data available for each human primary cell type in the Human Primary Cell Atlas(HPCA) data.Numbers of reference microarray data available for each human primary cell type in the HPCA data retrieved using the celldex package.&quot;,
+        label = &quot;chap5_supp_table1&quot;
+    )  %&gt;%
+    xtable::print.xtable(
+        &quot;~/PhD_thesis/draft_figure/chapter_05/supp_table1.tex&quot;, type = &quot;latex&quot;,
+        caption.placement = &quot;top&quot;,
+        include.rownames = FALSE,
+        add.to.row = list(
+            pos = list(which(temp$`HPCA cell type` == &quot;Fibroblasts&quot;) - 1),
+            command = &quot;\\rowfont{\\color{red}}&quot;),
+        sanitize.text.function = function(x) x)</code></pre>
+<pre class="r"><code>temp &lt;- wu_cellMeta %&gt;%
+    group_by(celltype_final) %&gt;%
+    summarise(n = n()) %&gt;%
+    .[order(.$n, decreasing = TRUE), ] %&gt;%
+   dplyr::rename(
+       &quot;Cell type&quot; = celltype_final, 
+       &quot;Number of cells&quot; = n
+   ) %&gt;%
+    mutate(
+        `Cell type` = str_replace_all(`Cell type`, &quot;_&quot;, &quot; &quot;)
+    ) 
+temp %&gt;%
+    xtable::xtable(
+        caption = &quot;Numbers of different cell types detected in the the study by Wu et al. (2020)\\cite{wu_stromal_2020}.&quot;,
+        label = &quot;chap5_supp_table2&quot;
+    )  %&gt;%
+    xtable::print.xtable(
+        &quot;~/PhD_thesis/draft_figure/chapter_05/supp_table2.tex&quot;, type = &quot;latex&quot;,
+        caption.placement = &quot;top&quot;,
+        include.rownames = FALSE,
+        add.to.row = list(
+            pos = as.list(which(temp$`Cell type` %in% c(&quot;iCAFs&quot;, &quot;myCAFs&quot;, &quot;dPVL&quot;, &quot;imPVL&quot;)) - 1),
+            command = rep(&quot;\\rowfont{\\color{red}}&quot;, 4)),
+        sanitize.text.function = function(x) x)</code></pre>
+<pre class="r"><code>acta2 &lt;- seurat_count %&gt;%
+    .[&quot;ACTA2&quot;,] %&gt;%
+    enframe(
+        name = &quot;cell&quot;, 
+        value = &quot;Log-norm Count&quot;
+    ) %&gt;%
+    left_join(
+        fibroblast[[]] %&gt;%
+            rownames_to_column(&quot;cell&quot;)
+    ) %&gt;%
+    mutate(CAF_pred = str_replace_all(CAF_pred, &quot;_&quot;, &quot; &quot;)) %&gt;%
+    ggplot(
+        aes(CAF_pred, `Log-norm Count`, fill = CAF_pred)
+    ) +
+    geom_violin() +
+    theme_minimal() +
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+    labs(
+        x = &quot;&quot;
+    ) +
+    scale_fill_discrete_qualitative(palette = &quot;Set 3&quot;, name = &quot;Predicted Cell Type&quot;)
+epcam &lt;- FeaturePlot(fibroblast, features = c(&quot;EPCAM&quot;)) +
+    ggtitle(&quot;&quot;)
+chap5_sup3 &lt;- (acta2 / epcam) +
+    plot_annotation(
+        tag_levels = &quot;A&quot;
+    ) &amp; 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = &quot;bold&quot; ), 
+        legend.key.size = unit(2, &quot;cm&quot;)
+    )
+# png(
+#     &quot;/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup3.png&quot;,
+#     height = 1900,
+#     width = 2100)
+# chap5_sup3
+# dev.off()</code></pre>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.3.0 (2023-04-21)
+Platform: x86_64-apple-darwin20 (64-bit)
+Running under: macOS Ventura 13.3.1
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/lib/libRlapack.dylib;  LAPACK version 3.11.0
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+time zone: Australia/Adelaide
+tzcode source: internal
+
+attached base packages:
+[1] splines   stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] kableExtra_1.3.4            knitr_1.42                 
+ [3] celldex_1.10.1              SingleR_2.2.0              
+ [5] BiocParallel_1.34.1         pheatmap_1.0.12            
+ [7] MAST_1.26.0                 SingleCellExperiment_1.22.0
+ [9] SummarizedExperiment_1.30.1 MatrixGenerics_1.12.0      
+[11] matrixStats_0.63.0          ggforce_0.4.1              
+[13] randomcoloR_1.1.0.1         ggpubr_0.6.0               
+[15] colorspace_2.1-0            patchwork_1.1.2            
+[17] plotly_4.10.1               corrplot_0.92              
+[19] SeuratObject_4.1.3          Seurat_4.3.0               
+[21] DT_0.27                     ggrepel_0.9.3              
+[23] cqn_1.46.0                  quantreg_5.95              
+[25] SparseM_1.81                preprocessCore_1.62.1      
+[27] nor1mix_1.3-0               mclust_6.0.0               
+[29] magrittr_2.0.3              ggfortify_0.4.16           
+[31] cowplot_1.1.1               ensembldb_2.24.0           
+[33] AnnotationFilter_1.24.0     GenomicFeatures_1.52.0     
+[35] AnnotationDbi_1.62.1        Biobase_2.60.0             
+[37] GenomicRanges_1.52.0        GenomeInfoDb_1.36.0        
+[39] IRanges_2.34.0              S4Vectors_0.38.1           
+[41] AnnotationHub_3.8.0         BiocFileCache_2.8.0        
+[43] dbplyr_2.3.2                BiocGenerics_0.46.0        
+[45] edgeR_3.42.2                limma_3.56.1               
+[47] glue_1.6.2                  pander_0.6.5               
+[49] scales_1.2.1                yaml_2.3.7                 
+[51] lubridate_1.9.2             forcats_1.0.0              
+[53] stringr_1.5.0               dplyr_1.1.2                
+[55] purrr_1.0.1                 readr_2.1.4                
+[57] tidyr_1.3.0                 tibble_3.2.1               
+[59] ggplot2_3.4.2               tidyverse_2.0.0            
+[61] workflowr_1.7.0            
+
+loaded via a namespace (and not attached):
+  [1] fs_1.6.2                      ProtGenerics_1.32.0          
+  [3] spatstat.sparse_3.0-1         bitops_1.0-7                 
+  [5] webshot_0.5.4                 httr_1.4.6                   
+  [7] RColorBrewer_1.1-3            backports_1.4.1              
+  [9] tools_4.3.0                   sctransform_0.3.5            
+ [11] utf8_1.2.3                    R6_2.5.1                     
+ [13] lazyeval_0.2.2                uwot_0.1.14                  
+ [15] withr_2.5.0                   sp_1.6-0                     
+ [17] prettyunits_1.1.1             gridExtra_2.3                
+ [19] progressr_0.13.0              cli_3.6.1                    
+ [21] spatstat.explore_3.1-0        labeling_0.4.2               
+ [23] sass_0.4.6                    spatstat.data_3.0-1          
+ [25] ggridges_0.5.4                pbapply_1.7-0                
+ [27] systemfonts_1.0.4             Rsamtools_2.16.0             
+ [29] svglite_2.1.1                 parallelly_1.35.0            
+ [31] rstudioapi_0.14               RSQLite_2.3.1                
+ [33] generics_0.1.3                BiocIO_1.10.0                
+ [35] vroom_1.6.3                   crosstalk_1.2.0              
+ [37] ica_1.0-3                     spatstat.random_3.1-4        
+ [39] car_3.1-2                     Matrix_1.5-4                 
+ [41] fansi_1.0.4                   abind_1.4-5                  
+ [43] lifecycle_1.0.3               whisker_0.4.1                
+ [45] carData_3.0-5                 Rtsne_0.16                   
+ [47] grid_4.3.0                    blob_1.2.4                   
+ [49] promises_1.2.0.1              ExperimentHub_2.8.0          
+ [51] crayon_1.5.2                  miniUI_0.1.1.1               
+ [53] lattice_0.21-8                beachmat_2.16.0              
+ [55] KEGGREST_1.40.0               pillar_1.9.0                 
+ [57] rjson_0.2.21                  future.apply_1.10.0          
+ [59] codetools_0.2-19              leiden_0.4.3                 
+ [61] getPass_0.2-2                 V8_4.3.0                     
+ [63] data.table_1.14.8             vctrs_0.6.2                  
+ [65] png_0.1-8                     gtable_0.3.3                 
+ [67] cachem_1.0.8                  xfun_0.39                    
+ [69] S4Arrays_1.0.4                mime_0.12                    
+ [71] survival_3.5-5                interactiveDisplayBase_1.38.0
+ [73] ellipsis_0.3.2                fitdistrplus_1.1-11          
+ [75] ROCR_1.0-11                   nlme_3.1-162                 
+ [77] bit64_4.0.5                   progress_1.2.2               
+ [79] filelock_1.0.2                RcppAnnoy_0.0.20             
+ [81] rprojroot_2.0.3               bslib_0.4.2                  
+ [83] irlba_2.3.5.1                 KernSmooth_2.23-21           
+ [85] DBI_1.1.3                     tidyselect_1.2.0             
+ [87] processx_3.8.1                bit_4.0.5                    
+ [89] compiler_4.3.0                curl_5.0.0                   
+ [91] git2r_0.32.0                  rvest_1.0.3                  
+ [93] xml2_1.3.4                    DelayedArray_0.26.2          
+ [95] rtracklayer_1.60.0            lmtest_0.9-40                
+ [97] callr_3.7.3                   rappdirs_0.3.3               
+ [99] digest_0.6.31                 goftest_1.2-3                
+[101] spatstat.utils_3.0-3          rmarkdown_2.21               
+[103] XVector_0.40.0                htmltools_0.5.5              
+[105] pkgconfig_2.0.3               sparseMatrixStats_1.12.0     
+[107] highr_0.10                    fastmap_1.1.1                
+[109] rlang_1.1.1                   htmlwidgets_1.6.2            
+[111] DelayedMatrixStats_1.22.0     shiny_1.7.4                  
+[113] farver_2.1.1                  jquerylib_0.1.4              
+[115] zoo_1.8-12                    jsonlite_1.8.4               
+[117] BiocSingular_1.16.0           RCurl_1.98-1.12              
+[119] GenomeInfoDbData_1.2.10       munsell_0.5.0                
+[121] Rcpp_1.0.10                   reticulate_1.28              
+[123] stringi_1.7.12                zlibbioc_1.46.0              
+[125] MASS_7.3-60                   plyr_1.8.8                   
+[127] parallel_4.3.0                listenv_0.9.0                
+[129] deldir_1.0-6                  Biostrings_2.68.0            
+[131] tensor_1.5                    hms_1.1.3                    
+[133] locfit_1.5-9.7                ps_1.7.5                     
+[135] igraph_1.4.2                  spatstat.geom_3.2-1          
+[137] ggsignif_0.6.4                ScaledMatrix_1.8.1           
+[139] reshape2_1.4.4                biomaRt_2.56.0               
+[141] BiocVersion_3.17.1            XML_3.99-0.14                
+[143] evaluate_0.21                 BiocManager_1.30.20          
+[145] tweenr_2.0.2                  tzdb_0.3.0                   
+[147] httpuv_1.6.10                 MatrixModels_0.5-1           
+[149] RANN_2.6.1                    polyclip_1.10-4              
+[151] future_1.32.0                 scattermore_1.0              
+[153] rsvd_1.0.5                    broom_1.0.4                  
+[155] xtable_1.8-4                  restfulr_0.0.15              
+[157] rstatix_0.7.2                 later_1.3.1                  
+[159] viridisLite_0.4.2             memoise_2.0.1                
+[161] GenomicAlignments_1.36.0      cluster_2.1.4                
+[163] timechange_0.2.0              globals_0.16.2               
+[165] here_1.0.1                   </code></pre>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

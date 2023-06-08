@@ -1,0 +1,1102 @@
+---
+title: "Differential_Expression"
+output: html_document
+author: "Wenjun Liu<br>Dame Roma Mitchell Cancer Research Laboratories<br>Adelaide Medical School<br>University of Adelaide"
+date: "2023-01-18"
+---
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 10
+)
+```
+
+```{r packages}
+library(tidyverse)
+library(yaml)
+library(scales)
+library(pander)
+library(glue)
+library(edgeR)
+library(AnnotationHub)
+library(ensembldb)
+library(cowplot)
+library(ggfortify)
+library(magrittr)
+library(cqn)
+library(ggrepel)
+library(DT)
+library(Seurat)
+library(corrplot)
+library(plotly)
+library(patchwork)
+library(colorspace)
+library(ggpubr)
+library(randomcoloR)
+library(ggforce)
+library(MAST)
+library(pheatmap)
+library(BiocParallel)
+library(UpSetR)
+library(msigdbr)
+library(goseq)
+library(sSNAPPY)
+
+```
+
+```{r options}
+panderOptions("table.split.table", Inf)
+panderOptions("big.mark", ",")
+theme_set(theme_bw())
+```
+
+```{r formatP}
+formatP <- function(p, m = 0.0001){
+out <- rep("", length(p))
+out[p < m] <- sprintf("%.2e", p[p<m])
+out[p >= m] <- sprintf("%.4f", p[p>=m])
+out
+}
+```
+
+## Gene Annotations
+
+```{r ah}
+ah <- AnnotationHub() %>%
+  subset(rdataclass == "EnsDb") %>%
+  subset(str_detect(description, "101")) %>%
+  subset(genome == "GRCh38")
+stopifnot(length(ah) == 1)
+```
+
+```{r ensDb}
+ensDb <- ah[[1]]
+genesGR <- genes(ensDb)
+transGR <- transcripts(ensDb)
+```
+
+```{r addTxLen}
+mcols(transGR) <- mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+```
+
+```{r addGcLen2Genes}
+mcols(genesGR) <- mcols(genesGR) %>%
+  as.data.frame() %>%
+  dplyr::select(
+    gene_id, gene_name, gene_biotype, entrezid
+  ) %>%
+  left_join(
+    mcols(transGR) %>%
+      as.data.frame() %>%
+      mutate(
+        tx_support_level = case_when(
+          is.na(tx_support_level) ~ 1L, 
+          TRUE ~ tx_support_level
+        )
+      ) %>%
+      group_by(gene_id) %>%
+      summarise(
+        n_tx = n(),
+        longest_tx = max(tx_len),
+        ave_tx_len = mean(tx_len),
+        gc_content = sum(tx_len*gc_content) / sum(tx_len)
+      ) %>%
+      mutate(
+        bin_length = cut(
+          x = ave_tx_len,
+          labels = seq_len(10),
+          breaks = quantile(ave_tx_len, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin_gc = cut(
+          x = gc_content,
+          labels = seq_len(10),
+          breaks = quantile(gc_content, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin = paste(bin_gc, bin_length, sep = "_")
+      ),
+    by = "gene_id"
+  ) %>%
+  set_rownames(.$gene_id) %>%
+  as("DataFrame")
+```
+
+# Read in seurat object
+
+The pre-processed `seurat` object was loaded in. 
+
+```{r}
+fibroblast <- readRDS(here::here("output/fibroblast_seurat.rds"))
+```
+
+
+```{r}
+# Color palettes used by most scRNA-seq methods could be found [here](https://rdrr.io/bioc/scater/src/R/plot_colours.R). 
+patient_col <- c(
+    "MF61" = "#A71B4B", 
+    "MF43" = "#584B9F"
+)
+# scanpy colors were found in https://github.com/scverse/scanpy/blob/034ca2823804645e0d4874c9b16ba2eb8c13ac0f/scanpy/plotting/palettes.py
+treat_col <- c(
+  VEH = rgb(0.7, 0.7, 0.7),
+  DHT = rgb(0.8, 0.2, 0.2))
+sample_col <- hcl.colors(n = 4) %>%
+    set_names(c("mf43DHT", "mf43VEH", "mf61DHT", "mf61VEH"))
+```
+
+
+There are two different strategies that can be used to perform differential expression analysis in scRNA-seq data: 
+1. Using methods specifically designed for scRNA-seq data, such as `MAST`. 
+2. Pseudo-bulking cells from the same groups together and use methods designed for bulk RNA-seq data, such as `edgeR`
+
+Both strategies will be applied to this dataset in this analysis. 
+
+# DE using MAST
+
+Firstly, differential expression analysis was perform using `MAST` to compare DHT-treated samples against the vehicle while nested within patients. 
+
+`sca` objects were created using `MAST::FromMatrix()` function and the actual linear mixed hurdle model fittings were done on the DRMCRL workstation.
+
+Note that the continuous part of the hurdle models is conditional of a gene being expressed, so if a gene had non-zero count in only one Cell Type + Type group, the models won't work. The `FindMarkers()` function in `Seruat` solves this by including a `min.pct` parameter so only genes that were detected in a minimum fraction of `min.pct` cells in either of the two populations would be tested. [The developer of `MAST` package also recommended this strategy](https://github.com/RGLab/MAST/issues/146) so only genes that had non-zero log-norm counts in at least 10% of vehicle or DHT-treated cells were tested. 
+
+```{r sca}
+# create SCA object
+seurat_data <- GetAssayData(object = fibroblast, slot = 'data')
+VEH_cell <- fibroblast[[]] %>%
+        dplyr::filter(Treatment == "VEH") %>%
+        rownames()
+gene2keep_VEH <- rowSums(seurat_data[, colnames(seurat_data) %in% VEH_cell] > 0) > (0.1 * length(VEH_cell))
+DHT_cell <- fibroblast[[]] %>%
+        dplyr::filter(Treatment == "DHT") %>%
+        rownames()
+gene2keep_DHT <- rowSums(seurat_data[, colnames(seurat_data) %in% DHT_cell] > 0) > (0.1 * length(DHT_cell))
+seurat_data <- seurat_data[gene2keep_DHT|gene2keep_VEH,]
+# MF43_cell <- fibroblast[[]] %>%
+#         dplyr::filter(patient == "MF43") %>%
+#         rownames()
+# gene2keep_MF43 <- rowSums(seurat_data[, colnames(seurat_data) %in% MF43_cell] > 0) > (0.1 * length(MF43_cell))
+# MF61_cell <- fibroblast[[]] %>%
+#         dplyr::filter(Treatment == "MF61") %>%
+#         rownames()
+# gene2keep_MF61 <- rowSums(seurat_data[, colnames(seurat_data) %in% MF61_cell] > 0) > (0.1 * length(MF61_cell))
+# seurat_data <- seurat_data[gene2keep_MF61|gene2keep_MF43,]
+sca <- MAST::FromMatrix(
+    exprsArray = as.matrix(seurat_data), 
+    cData = fibroblast[[]], 
+    fData = data.frame(primerid = rownames(seurat_data)) %>%
+            set_rownames(rownames(seurat_data))
+)
+```
+
+Cell detection rate was calculated for each gene and added to the `sca` object..
+
+```{r}
+cdr <- colSums(SummarizedExperiment::assay(sca)>0)
+SummarizedExperiment::colData(sca)$ngeneson <- scale(cdr)
+```
+
+The reference level of treatment was set to VEH. 
+
+```{r}
+SummarizedExperiment::colData(sca)$Treatment <- factor(SummarizedExperiment::colData(sca)$Treatment, levels = c("VEH", "DHT"))
+SummarizedExperiment::colData(sca)$patient <- factor(SummarizedExperiment::colData(sca)$patient)
+SummarizedExperiment::colData(sca)$patient <- droplevels(SummarizedExperiment::colData(sca)$patient)
+```
+
+```{r}
+# saveRDS(sca, here::here("data/sca.rds"))
+```
+
+Hurdle model was fitted with the patient as a random effect to nest the comparisons in patient using linear mixed modelling. (This step was performed on the DRMCRL workstation).
+
+```{r}
+zlm_summary_mixed <- readRDS(here::here("output/zlm_summary_mixed.rds"))$datatable
+zlm_summary_mixed <- zlm_summary_mixed %>%
+        dplyr::filter(contrast=='TreatmentDHT' & component=='H') %>%
+        dplyr::select(primerid, `Pr(>Chisq)`) %>%
+        left_join(
+            # logFC
+            zlm_summary_mixed %>%
+                dplyr::filter(contrast=='TreatmentDHT' & component=='logFC') %>%
+                dplyr::select(primerid, logFC = coef, ci.hi, ci.lo) 
+        )  %>%
+        mutate(FDR = p.adjust(`Pr(>Chisq)`, "fdr"),
+               DE = ifelse(FDR < 0.05, TRUE, FALSE)
+               ) %>%
+        dplyr::rename(gene_name = primerid)
+```
+
+To my surprise, with the linear mixed model, even with a stringent cut-off of FDR < 0.01, There were still `r nrow(dplyr::filter(zlm_summary_mixed, FDR < 0.01))` genes passing the significance threshold and being considered differentially expressed. 
+
+### Knott MAST results
+
+In the study by [Rath et al. (2023)](https://www.cell.com/cell-genomics/pdf/S2666-979X(23)00032-0.pdf), breast tissues from 9 trans-male donors who have been undertaking gender-affirming therapy (masculinizing dose of androgen) were compared against 9 cis-females' breast through snRNA-seq. 
+
+The pre-processed `Seurat` object for the snRNA-seq data in that study was shared with us by the authors. In the original study, differential expression analyses were performed for each detected cell type withouth accounting for the confounding effect of patients. Therefore, I re-analysed the data using MAST with donor as a random effect as described above. Only genes that had non-zero log-norm counts in at least 10% of CF or TF cells were tested. Results derived from fibroblast cells were loaded. 
+
+
+
+```{r}
+knott_mast_de <- readRDS(
+    "~/20131906_HickeyT_JC_NormalBreast/output/knott_fibro_mast.rds"
+) %>%
+    mutate(knott = -sign(coef) * log10(`Pr(>Chisq)`))
+```
+`r nrow(dplyr::filter(knott_mast_de, DE))` out of the `r nrow(knott_mast_de)` tested genes were considered as significantly differentially expressed with a FDR cut-off of 0.05. 
+
+Ranking statistics for genes in both datasets were defined as $$-sign(logFC) \times \log_{10} (p{\text -}value)$$.
+
+```{r}
+knott_mast_de <- readRDS(
+    "~/20131906_HickeyT_JC_NormalBreast/output/knott_fibro_mast.rds"
+) %>%
+    mutate(knott = -sign(coef) * log10(`Pr(>Chisq)`))
+```
+
+```{r}
+fibro_2RS <- zlm_summary_mixed %>%
+    mutate(pilot = -sign(logFC) * log10(`Pr(>Chisq)`)) %>%
+    dplyr::select(gene_name, pilot) %>%
+    left_join(
+        knott_mast_de%>%
+            dplyr::select(gene_name , knott)
+    ) %>%
+    drop_na()
+fibro_2RS_cor <- cor.test(fibro_2RS$pilot, fibro_2RS$knott)
+```
+
+Correlation between the ranking statistics derived from the two independent studies was found to be `r round( fibro_2RS_cor$estimate, digits = 3)` with a p-value of `r round(fibro_2RS_cor$p.value, digit = 3)`.
+
+```{r}
+pilotRK <- zlm_summary_mixed %>%
+    mutate(pilot = -sign(logFC) * log10(`Pr(>Chisq)`))  %>%
+    dplyr::filter(DE) %>%
+    pull(pilot)
+knottRK <- knott_mast_de  %>%
+    dplyr::filter(DE) %>%
+    pull(knott)
+```
+
+```{r, fig.height=10, fig.width=14, fig.cap="*Comparison of ranking statistics derived from the knott fibroblast cells against this pilot study. Genes with top 50 ranked mean absolute ranking statistics were labelled. The blue lines indicate the significance threshold for both studies.*"}
+cor_plot <- fibro_2RS %>%
+    mutate(aveRS = (pilot + knott)/2) %>%
+    .[order(abs(.$aveRS), decreasing = TRUE),] %>%
+    mutate(RANK = row_number()) %>%
+    ggplot(
+        aes(pilot , knott)
+    ) +
+    geom_point() +
+  geom_vline(
+    xintercept = 0,
+    linetype = 2,
+    size = 1.5,
+    colour = "red"
+  ) +
+    geom_vline(
+    xintercept = c(max(knottRK[knottRK < 0]), min(knottRK[knottRK > 0])),
+    linetype = 2,
+    size = 1.5,
+    colour = "blue"
+  ) +
+  geom_hline(
+    yintercept = 0,
+    linetype = 2,
+    size = 1.5,
+    colour = "red"
+  ) +
+    geom_hline(
+    yintercept = c(max(pilotRK[pilotRK < 0]), min(pilotRK[pilotRK > 0])),
+    linetype = 2,
+    size = 1.5,
+    colour = "blue"
+  ) +
+    geom_text_repel(
+        aes(label = gene_name), 
+        data = . %>% 
+            dplyr::filter(
+                RANK < 50
+            ), 
+        color = "red", 
+        size = 10
+    ) +
+    labs(
+        x = "Ranking Statistic (DHT vs Veh)", 
+        y = "Ranking Statistic (trans-male vs cis-female)", 
+        # title = paste("Correlation between logFCs between the 2 study:", 
+        #                 round(cor(fibro_2R$pilot, fibro_2FC$knott), digits = 2), 
+        #                 sep = " ")
+    ) 
+cor_plot
+```
+
+
+### AR signature
+
+```{r}
+AR_sig <- read.csv(here::here("data/AR_sig_down.csv")) %>%
+    mutate(AR_sig = "Down") %>%
+    rbind(
+        read.csv(here::here("data/AR_sig_up.csv")) %>%
+            mutate(AR_sig = "Up")
+    )
+AR_sig_col <- AR_sig %>%
+    mutate(
+        color = ifelse(AR_sig == "Down",'blue', "red")
+    )
+```
+
+A list of `r nrow(AR_sig)` AR signatures that were identified in ER-positive breast cancer cell lines and xenograft models were loaded and the following ones were considered differentially expressed in DHT-treated fibroblasts:
+
+```{r}
+zlm_summary_mixed %>%
+    dplyr::filter(
+        FDR < 0.01, 
+        gene_name %in% AR_sig$gene_name
+    )  %>%
+    left_join(
+        AR_sig 
+    ) %>%
+    mutate(
+        Align = case_when(
+           logFC < 0 & AR_sig == "Down" ~ "\u2714 Yes",
+           logFC > 0 & AR_sig == "Up" ~ "\u2714 Yes",
+           logFC < 0 & AR_sig == "Up" ~ "\u2716 No",
+           logFC > 0 & AR_sig == "Down" ~ "\u2716 No"
+        )
+    ) %>%
+    mutate_if(is.character, as.factor) %>%
+    mutate_at(vars(c("Pr(>Chisq)", "FDR")), formatP) %>%
+    mutate(logFC = round(logFC, 3)) %>%
+    dplyr::select(
+        `Gene Name` = gene_name,
+        `Signature type` = AR_sig,
+        logFC,
+        PValue = `Pr(>Chisq)`,
+        FDR, Align
+    ) %>%
+    datatable(
+        filter = "top", 
+        caption = htmltools::tags$caption(
+            htmltools::em(
+                "AR signatures that were differentially expressed in DHT-treated fibroblast cells. The align column shows whether directions of changes in this study align with AR signature type")
+        ), 
+        options = list(scrollY = "450px")
+    ) %>%
+    formatStyle(
+        'logFC',
+        color = styleInterval(0, c('blue', "red"))
+    ) %>%
+    formatStyle(
+        'Signature type',
+            color = styleEqual(c("Down", "Up"), c('blue', "red"))
+    ) %>%
+    formatStyle(
+        'Align',
+            color = styleEqual(c( "\u2714 Yes", "\u2716 No"), c("#008000", "#e00000"))
+    )
+
+```
+
+
+Not all of the AR signaturs that were differentially expressed in DHT-treated cells showed directions of changes that aligned with their signature types in ER-pos breast cancer. 
+
+
+### Pathway analysis using GOseq
+
+```{r}
+DE_mast <- zlm_summary_mixed %>%
+    dplyr::filter(
+        FDR < 0.01
+    ) %>%
+    left_join(
+        genesGR %>%
+            as.data.frame() %>% 
+            dplyr::select(gene_name, gene_id)
+    )
+```
+
+#### KEGG {.tabset}
+
+```{r}
+gsTopology <- retrieve_topology(
+    database = "kegg", species = "hsapiens")
+# names(gsTopology) <- str_remove_all(names(gsTopology), "kegg.")
+source(here::here("analysis/make_gsNetwork.R"))
+kg <- get_GSgenelist(gsTopology)
+genesGR <- genesGR %>%
+    as.data.frame() %>%
+    unnest(entrezid)
+kg <- kg %>%
+    mutate(gene_id = str_remove_all(gene_id, "ENTREZID:")) %>%
+    dplyr::rename(entrezid = gene_id) %>%
+    left_join(genesGR %>%
+                  dplyr::select(entrezid, gene_name, gene_id) %>%
+                  mutate(entrezid = as.character(entrezid)))
+kgByGene <- kg  %>%
+  split(f = .$gene_id) %>%
+  lapply(extract2, "gs_name")
+kgByGs <- kg  %>%
+  split(f = .$gs_name) %>%
+  lapply(extract2, "entrezid")
+load(system.file("extdata", "entrez2name.rda", package = "sSNAPPY"))
+```
+
+`r length(kgByGs)` KEGG pathways were retrieved from `msigdbr`. 
+
+Enrichment of KEGG pathways among DEGs found with MAST was tested with `goseq`, using gene length as an offset. 
+
+```{r lenPwf}
+lenPwf <-  transGR %>%
+    as.data.frame() %>%
+    distinct(gene_id, .keep_all = TRUE) %>%
+    dplyr::select(gene_id, tx_len) %>%
+    mutate(Status = case_when(gene_id %in% DE_mast$gene_id  ~ 1, !gene_id %in% DE_mast$gene_id   ~ 0)) %>%
+    with(
+      nullp(
+        DEgenes = structure(
+          Status, names = gene_id
+        ),
+        genome = "GRCh38.p16",
+        id = "ensGene",
+        bias.data = tx_len,
+        plot.fit = FALSE
+      )
+    )
+```
+
+```{r}
+goseq_kg <- goseq(lenPwf,
+        gene2cat = kgByGene) %>%
+  as_tibble %>%
+  dplyr::filter(numDEInCat > 0) %>%
+  mutate(
+    adjP = p.adjust(over_represented_pvalue, method = "bonf"),
+    FDR = as.numeric(p.adjust(over_represented_pvalue, method = "fdr"))
+  ) %>%
+  dplyr::select(-contains("under")) %>%
+  dplyr::rename(
+    gs_name = category,
+    PValue = over_represented_pvalue,
+    nDE = numDEInCat,
+    nExpressed = numInCat
+  ) %>%
+  left_join(kg) %>%
+    dplyr::select(
+    gs_name, nExpressed, nDE, 
+    contains("P", ignore.case = FALSE),
+    FDR,
+    gene_name, gene_id
+  ) %>%
+  dplyr::filter(
+      gene_name %in% DE_mast$gene_name
+  ) %>%
+    chop(c("gene_name", "gene_id")) %>%
+  mutate(
+    gene_name = vapply(.$gene_name, function(x){
+      paste(x,collapse = "; ")
+    }, character(1)),
+    gene_id = vapply(.$gene_id, function(x){
+      paste(x,collapse = "; ")
+    }, character(1))
+  ) %>%
+  dplyr::rename(DE = gene_name) %>%
+  mutate_at(
+    vars(one_of(c("PValue", "adjP", "FDR"))),
+    formatP
+  )
+```
+
+KEGG pathways that were defined to be significantly enriched (FDR < 0.05) by `goseq` were:
+
+```{r}
+goseq_kg %>%
+    dplyr::filter(FDR < 0.05) %>%
+    mutate_if(is.character, as.factor) %>%
+    datatable(
+        filter = "top", 
+        options = list(scrollY = '450px'), 
+        caption = htmltools::tags$caption(
+            htmltools::em(
+                "KEGG pathways that were significantly enriced among differentially expressed genes detected using MAST. The DE column contains pathways genes that were also differentially expressed genes.")
+        )
+    ) 
+```
+
+
+
+
+# DE on pseudo-bulk
+
+Raw counts of cells belonging to the same cell type from the same donor were summed into pseudo-bulk profiles.
+
+```{r}
+seurat_count <- GetAssayData(object = fibroblast, slot = 'counts')
+```
+
+```{r}
+minCPM <- 1.5
+minSample <- 2
+```
+
+The criteria for a gene to be considered as detected, $>$ `r minCPM` counts per million (CPM) were required to observed in $\geq$ `r minSample` samples.Additionally, only genes with known average transcript length and GC content were kept. 
+
+```{r}
+genesGR <- genesGR %>%
+     as.data.frame() %>%
+    .[!duplicated(.$gene_name),]
+rownames(genesGR) <- genesGR[,"gene_name"]
+```
+
+```{r}
+pseudo_by <-  fibroblast[[]] %>%
+    droplevels() %>%
+    split(f = .$Sample) %>%
+    lapply(rownames)
+pseudo_bulk <- sapply(names(pseudo_by), function(x){
+    seurat_count %>%
+        .[,colnames(.) %in% pseudo_by[[x]]] %>%
+        rowSums()
+}, simplify = FALSE) %>%
+    do.call(rbind,.) %>%
+    t()
+gene2keep <- pseudo_bulk %>%
+  edgeR::cpm(log = TRUE) %>%
+    is_greater_than(minCPM) %>%
+    rowSums() %>%
+    is_weakly_greater_than(minSample)
+sample_meta <- fibroblast[[]] %>%
+    dplyr::select(Sample, Treatment, patient) %>%
+    unique() %>%
+    set_rownames(NULL) %>%
+    droplevels()
+```
+
+
+Of the `r comma(nrow(seurat_count))` genes contained in the original `seurat`object, `r comma(sum(!gene2keep))`  genes were removed as failing this criteria for detection, leaving `r comma(sum(gene2keep))` genes for downstream analysis. 
+
+```{r plotDensities, fig.height=5, fig.width = 14, fig.cap="*Distributions of logCPM values on pseudo-bulk counts, A) before and B) after filtering of undetectable genes.*"}
+p1 <- pseudo_bulk %>%
+  edgeR::cpm(log = TRUE) %>%
+  as.data.frame() %>%
+  rownames_to_column("gene_id") %>%
+  as_tibble() %>%
+  pivot_longer(
+    cols = -"gene_id",
+    names_to = "Sample",
+    values_to = "logCPM"
+  ) %>%
+  left_join(sample_meta) %>%
+  ggplot(aes(logCPM, stat(density), colour = Sample, linetype = Treatment)) +
+  geom_density() +
+  labs(
+    y = "Density",
+    colour = "Sample",
+    linetype = "Treatment"
+  ) +
+    scale_color_manual(values = sample_col)
+p2 <- pseudo_bulk[gene2keep, ] %>%
+  edgeR::cpm(log = TRUE) %>%
+  as.data.frame() %>%
+  rownames_to_column("gene_id") %>%
+  as_tibble() %>%
+  pivot_longer(
+    cols = -"gene_id",
+    names_to = "Sample",
+    values_to = "logCPM"
+  ) %>%
+  left_join(sample_meta) %>%
+  ggplot(aes(logCPM, stat(density), colour = Sample, linetype = Treatment)) +
+  geom_density() +
+  labs(
+    y = "Density",
+    colour = "Sample",
+    linetype = "Treatment"
+  ) +
+    scale_color_manual(values = sample_col)
+plot_grid(
+    plot_grid(
+    p1 + theme(legend.position = "none"), 
+    p2 + theme(legend.position = "none"), 
+    labels = c("A", "B"),
+    nrow = 1), 
+    get_legend(p1), 
+    nrow = 1, 
+    rel_widths = c(6,1))
+```
+
+```{r}
+pseudo_bulk <- pseudo_bulk[gene2keep, ]
+geneWithInfo <- rownames(pseudo_bulk) %in% rownames(genesGR)
+pseudo_bulk <- pseudo_bulk[geneWithInfo, ]
+```
+
+A `DGEList` was created using the filtered counts and sample metadata. 
+
+```{r}
+dge <- pseudo_bulk %>%
+        DGEList(
+            samples = sample_meta %>%
+                set_rownames(.$Sample) %>%
+                .[match(colnames(pseudo_bulk), rownames(.)),],
+            genes = genesGR[rownames(.),]
+        ) %>%
+  calcNormFactors()
+```
+
+
+### Library Sizes
+
+Due to the differences in the numbers of cells derived from each sample seen earlier, there were large differences in the library sizes of pseudo-bulk samples too. 
+
+```{r plotLibSizes, fig.height=5, fig.width = 12, fig.cap = "*Library sizes of all samples after removal of undetectable genes. The common-use minimum library size of 10 million reads is shown as a dashed line.*"}
+dge$samples %>%
+    ggplot(aes(Sample, lib.size, fill = Sample)) +
+    geom_col() +
+    geom_hline(yintercept = 1e7, linetype = 2) +
+    scale_y_continuous(
+        labels = comma, expand = expansion(c(0, 0.05))
+    ) +
+    scale_fill_manual(values= sample_col) +
+    labs(x = "Sample Name", y = "Library Size", fill = "Sample")  +
+    theme(legend.position = "top")
+```
+
+
+### PCA: Pre Normalisation
+
+```{r pca}
+pca <- dge %>%
+  edgeR::cpm(log = TRUE) %>%
+  t() %>%
+  prcomp() 
+```
+
+
+```{r, fig.cap="*Pre-normalisation PCA plot with arrows pointing from treated to corresponding vehicle sample.The 2 arrows were pointing at completely opposite directions.*"}
+broom::tidy(pca) %>% 
+  dplyr::filter(PC %in% 1:2) %>% 
+  dplyr::rename(Sample = row) %>% 
+  left_join(dge$samples) %>% 
+  pivot_wider(names_from = "PC", values_from = "value", names_prefix = "PC") %>%
+  ggplot(
+    aes(PC1, PC2, colour = Treatment)
+  ) +
+  geom_point(size = 2) +
+  geom_segment(
+    aes(x = `PC1_VEH`, y = `PC2_VEH`, xend = `PC1_DHT`, yend = `PC2_DHT`),
+    data = . %>% 
+      dplyr::select(patient, Treatment,  PC1, PC2) %>%
+      pivot_wider(names_from = "Treatment", values_from = c("PC1", "PC2")) ,
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.02, "npc"), type = "closed"),
+    colour = "grey30"
+  ) +
+  geom_label_repel(
+    aes(label = patient),
+    color = "black",
+    fill = rgb(1, 1, 1, 0.5),
+    size = 5,
+    data = . %>% 
+      group_by(patient) %>% 
+      summarise(PC1 = mean(PC1), PC2 = mean(PC2), .groups = "drop")
+  ) +
+  labs(
+    x = glue("PC1 ({percent(summary(pca)$importance[2, 1], 0.1)})"),
+    y = glue("PC2 ({percent(summary(pca)$importance[2, 2], 0.1)})")
+  ) +
+  scale_colour_manual(values = treat_col) 
+```
+### Normalisation
+
+```{r cqn}
+cqn <-  with(
+    dge,
+    cqn(
+        counts= counts,
+        x = genes$gc_content,
+        lengths = genes$ave_tx_len
+    )
+)
+dge$offset <- cqn$glm.offset
+logCPM <- cqn$y + cqn$offset
+pcaPost <- logCPM %>%
+    t() %>%
+    prcomp() 
+```
+
+```{r, fig.cap="*Post-normalisation PCA plot with arrows pointing from treated to corresponding vehicle sample.The 2 arrows were still pointing at completely opposite directions even after normalisation.*"}
+pca_post_plot <- broom::tidy(pcaPost) %>% 
+  dplyr::filter(PC %in% 1:2) %>% 
+  dplyr::rename(Sample = row) %>% 
+  left_join(dge$samples) %>% 
+  pivot_wider(names_from = "PC", values_from = "value", names_prefix = "PC") %>%
+  ggplot(
+    aes(PC1, PC2, colour = Treatment)
+  ) +
+  geom_point(size = 4) +
+  geom_segment(
+    aes(x = `PC1_VEH`, y = `PC2_VEH`, xend = `PC1_DHT`, yend = `PC2_DHT`),
+    data = . %>% 
+      dplyr::select(patient, Treatment,  PC1, PC2) %>%
+      pivot_wider(names_from = "Treatment", values_from = c("PC1", "PC2")) ,
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.05, "npc"), type = "closed"),
+    colour = "grey30"
+  ) +
+  geom_label_repel(
+    aes(label = patient),
+    color = "black",
+    fill = rgb(1, 1, 1, 0.5),
+    size = 5,
+    data = . %>% 
+      group_by(patient) %>% 
+      summarise(PC1 = mean(PC1), PC2 = mean(PC2), .groups = "drop")
+  ) +
+  labs(
+    x = glue("PC1 ({percent(summary(pca)$importance[2, 1], 0.1)})"),
+    y = glue("PC2 ({percent(summary(pca)$importance[2, 2], 0.1)})")
+  ) +
+  scale_colour_manual(values = treat_col) 
+pca_post_plot
+```
+### edgeR
+
+Average treatment response was tested through fitting quasi-likelihood negative binomial GLMs through `edgeR`. Model matrix in the form of `model.matrix(~ 0 + patient + Treatment, data = dge$samples)` was  constructed. 
+
+```{r fit}
+X <- model.matrix(~ 0 + patient + Treatment,
+                  data = dge$samples %>%
+                      mutate(Treatment = factor(Treatment, levels = c("VEH", "DHT")))
+) %>%
+    set_colnames(str_remove_all(colnames(.), "patient|Treatment")) %>%
+    .[,colSums(.) != 0]  
+dge <- estimateDisp(dge, design = X, robust = TRUE)
+fit <- glmQLFit(dge)
+```
+
+
+```{r topTables}
+alpha <- 0.05
+topTable <- glmQLFTest(fit, coef = "DHT") %>%
+      topTags(n = Inf) %>%
+      .[["table"]] %>%
+      as_tibble() %>%
+      mutate(
+        location = paste0(seqnames, ":", start, "-", end, ":", strand),
+        rankingStat = -sign(logFC)*log10(PValue),
+        signedRank = rank(rankingStat),
+        DE = FDR < alpha
+      ) %>%
+      dplyr::select(
+        gene_id, gene_name, logCPM, logFC, PValue, FDR, 
+        location, gene_biotype, entrezid, ave_tx_len, gc_content,
+        rankingStat, signedRank, DE
+      )
+DEGs <- topTable %>%
+    dplyr::filter(DE)
+```
+
+With this pseudo-bulk + edgeR approach, only `r nrow(DEGs)` gene had a FDR < 0.05, out of the `r nrow(topTable)` genes tested. 
+
+```{r}
+topTable %>%
+    dplyr::filter(DE) %>%
+    mutate_at(vars(c("PValue", "FDR")), formatP) %>%
+    mutate_at(vars(c("logCPM", "logFC")), round, 4) %>%
+    dplyr::select(`Gene name` = gene_name, 
+                  `Gene ID` = gene_id, 
+                  logCPM, logFC, PValue, 
+                  FDR , DE) %>%
+    mutate_if(is.character, as.factor) %>%
+    datatable(
+       filter = "top", 
+       caption = htmltools::tags$caption(
+            htmltools::em(
+                "Gene that was differentially expressed post-treatment.")
+        )
+    ) %>% 
+    formatStyle(
+        'logFC', 
+        color = styleInterval(0, c('blue', "red"))
+    )
+```
+
+This gene RASD2 was not an AR signature. 
+
+```{r}
+# AR_sig %>%
+#     dplyr::filter(gene_name == DEGs$gene_name)
+```
+
+
+```{r, fig.cap="*LogCPM of the only differentially expressed gene detected using the pseudo-bulk approach RASD2*"}
+bp_basd2 <- logCPM %>%
+    .["RASD2",] %>%
+    enframe(
+        name = "Sample", 
+        value = "logCPM"
+    ) %>%
+    left_join(sample_meta) %>%
+    ggplot(
+        aes(Treatment, logCPM, color = Treatment )
+    ) +
+    geom_boxplot() +
+    geom_point(size = 6) +
+    scale_color_manual(values = treat_col) 
+bp_basd2
+```
+
+### Knott pseudo-bulk signature
+
+Differential expression analysis using the pseudo-bulk + edgeR approach was also performed on the cis-female and trans-female breast snRNA-seq data . 
+
+```{r}
+knott_pseudo_de <- readRDS("~/20131906_HickeyT_JC_NormalBreast/output/knott_pseudo_de.rds")
+knott_pseudo_de <- knott_pseudo_de$Fibroblast 
+```
+
+`r nrow(knott_pseudo_de %>% dplyr::filter(DE))` DEGs were detected with a FDR cut-off of 0.05.
+
+```{r}
+fibro_2RS_pseudo <- topTable %>%
+    dplyr::select(gene_name, pilot = rankingStat) %>%
+    left_join(
+        knott_pseudo_de %>%
+            dplyr::select(gene_name , knott = rankingStat)
+    ) %>%
+    drop_na()
+fibro_2RS_cor_pseudo <- cor.test(fibro_2RS_pseudo$pilot, fibro_2RS_pseudo$knott)
+```
+
+Correlation between the ranking statistics derived from the two independent studies was `r round( fibro_2RS_cor_pseudo$estimate, digits = 3)` with a p-value of `r fibro_2RS_cor_pseudo$p.value`.
+
+
+```{r, fig.height=10, fig.width=14, fig.cap="*Comparison of ranking statistics derived from the knott fibroblast cells against this pilot study. Genes with top 50 ranked mean absolute ranking statistics were labelled.*"}
+cor_plot_pseudo <- fibro_2RS_pseudo %>%
+    mutate(aveRS = (pilot + knott)/2) %>%
+    .[order(abs(.$aveRS), decreasing = TRUE),] %>%
+    mutate(RANK = row_number()) %>%
+    ggplot(
+        aes(pilot , knott)
+    ) +
+    geom_point() +
+    geom_text_repel(
+        aes(label = gene_name), 
+        data = . %>% 
+            dplyr::filter(
+                RANK < 50
+            ), 
+        color = "red"
+    ) +
+  geom_vline(
+    xintercept = 0,
+    linetype = 2,
+    size = 1.5,
+    colour = "red"
+  ) +
+  geom_hline(
+    yintercept = 0,
+    linetype = 2,
+    size = 1.5,
+    colour = "red"
+  ) +
+    labs(
+        x = "In vitro fibroblast DHT vs Veh ranking stat", 
+        y = "TM vs CF fibroblast ranking stat", 
+        # title = paste("Correlation between logFCs between the 2 study:", 
+        #                 round(cor(fibro_2R$pilot, fibro_2FC$knott), digits = 2), 
+        #                 sep = " ")
+    ) +
+    theme(
+        axis.title  = element_text(size = 16)
+    )
+cor_plot_pseudo
+```
+
+
+# Thesis figure
+
+Code for reproducing figures used in the theis:
+
+```{r}
+# thesis chapter 5 table
+zlm_summary_mixed %>%
+    dplyr::filter(
+        FDR < 0.01, 
+        gene_name %in% AR_sig$gene_name
+    )  %>%
+    left_join(
+        AR_sig 
+    ) %>%
+    mutate(
+        Align = case_when(
+            logFC < 0 & AR_sig == "Down" ~ "\\color{teal}✓",
+            logFC > 0 & AR_sig == "Up" ~ "\\color{teal}✓",
+            logFC < 0 & AR_sig == "Up" ~ "✗",
+            logFC > 0 & AR_sig == "Down" ~ "✗"
+        ), 
+        AR_sig = ifelse(
+            AR_sig == "Down", "\\color{blue}Down", "\\color{red}Up"
+        )
+    ) %>%
+    mutate_if(is.character, as.factor) %>%
+    .[order(.$FDR),] %>%
+    mutate_at(vars(c("Pr(>Chisq)", "FDR")), formatP) %>%
+    mutate(logFC = as.character(round(logFC, 4))) %>%
+    dplyr::select(
+        `Gene Name` = gene_name,
+        `Expected Direction` = AR_sig,
+        logFC,FDR, Concordant = Align
+    ) %>%
+    xtable::xtable(
+        caption = "AR signatures defined in ER-positive BC\\cite{hickey_androgen_2021} that were also differentially expressed upon DHT treatment in mammary fibroblasts. The concordant column reflects whether the signs of logFCs in fibroblasts agreed with the signature types in malignant epithelial cells (ie. expected direction).", 
+        label = "chap5_table3"
+    )  %>%
+     xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/table3.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        sanitize.text.function = function(x) x)
+```
+
+```{r}
+pca_post_plot <- broom::tidy(pcaPost) %>% 
+  dplyr::filter(PC %in% 1:2) %>% 
+  dplyr::rename(Sample = row) %>% 
+  left_join(dge$samples) %>% 
+  pivot_wider(names_from = "PC", values_from = "value", names_prefix = "PC") %>%
+  ggplot(
+    aes(PC1, PC2, colour = Treatment)
+  ) +
+  geom_point(size = 8) +
+  geom_segment(
+    aes(x = `PC1_VEH`, y = `PC2_VEH`, xend = `PC1_DHT`, yend = `PC2_DHT`),
+    data = . %>% 
+      dplyr::select(patient, Treatment,  PC1, PC2) %>%
+      pivot_wider(names_from = "Treatment", values_from = c("PC1", "PC2")) ,
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.05, "npc"), type = "closed"),
+    colour = "grey30"
+  ) +
+  geom_label_repel(
+    aes(label = patient),
+    color = "black",
+    fill = rgb(1, 1, 1, 0.5),
+    size = 18,
+    data = . %>% 
+      group_by(patient) %>% 
+      summarise(PC1 = mean(PC1), PC2 = mean(PC2), .groups = "drop")
+  ) +
+  labs(
+    x = glue("PC1 ({percent(summary(pca)$importance[2, 1], 0.1)})"),
+    y = glue("PC2 ({percent(summary(pca)$importance[2, 2], 0.1)})")
+  ) +
+  scale_colour_manual(values = treat_col) 
+```
+
+```{r}
+chap5_fig7 <- cor_plot &
+    theme(
+        text = element_text(size = 50)
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig7.png",
+#     height = 1600,
+#     width = 2000
+# )
+#chap5_fig7
+# dev.off()
+```
+
+```{r, fig.width=12, fig.height=5}
+chap5_fig8 <- (pca_post_plot | bp_basd2 + theme(legend.position = "none")) + 
+    plot_layout(guides = "collect") +
+    plot_annotation(tag_levels = 'A') &
+    theme(
+        plot.margin = unit(rep(1, 4), "cm"),
+        text = element_text(size = 50),
+        # axis.text.x = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig8.png",
+#     height = 1200,
+#     width = 2400
+# )
+#chap5_fig8
+# dev.off()
+```
+
+```{r}
+# # supp_table3
+# library(xlsx)
+```
+
+```{r}
+## Table 4 (top 10 most enriched pathways)
+goseq_kg %>%
+    dplyr::filter(FDR < 0.05) %>%
+    mutate(
+        gs_name = str_remove_all(gs_name, "kegg.")
+    ) %>%
+    dplyr::select(
+        `Gene-set name` = gs_name,
+        FDR = adjP,
+        `Number of DE pathway gene` = nDE,
+        `Number of expressed pathway gene` = nExpressed
+    ) %>%
+    .[1:10,] %>%
+    xtable::xtable(
+        caption = "Top 10 KEGG pathways significantly enriched among DEGs detected among DHT-treated mammary fibroblasts. Top 10 KEGG pathways significantly enriched among DEGs detected using GOseq between DHT-treated vs vehicle fibroblasts. Gene length was used as an offset term to account for any bias in the enrichment analysis. Pathways with a FDR \\textless 0.05 were considered to be significantly enriched.", 
+        label = "chap5_table4"
+    )  %>%
+     xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/table4.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        sanitize.text.function = function(x) x)
+```
+
+```{r}
+source(here::here("analysis/plot_commu_temp.R"))
+library(reshape2)
+library(ggraph)
+library(igraph)
+```
+
+```{r, fig.width=24, fig.height=15}
+set.seed(123)
+chap5_fig9 <- goseq_kg %>%
+    dplyr::filter(FDR < 0.05) %>%
+    mutate(pvalue = as.numeric(PValue)) %>%
+    plot_community_temp(
+        normalisedScores = .,
+        gsTopology = gsTopology,
+        colorBy = "pvalue",
+        color_lg_title = "-log10(P-value)",
+        lb_size = 16,
+        scale_nodeSize = c(10, 14),
+        label.fontsize = 50,
+         label.buffer = unit(60, "mm"),
+    ) +
+    theme(
+        panel.border = element_blank(),
+        legend.key.size = unit(20, "mm"),
+        text = element_text(size = 40)
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig9.png",
+#     height = 3200,
+#     width = 3800
+# )
+#chap5_fig9
+# dev.off()
+```

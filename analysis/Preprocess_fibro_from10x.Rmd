@@ -1,0 +1,743 @@
+---
+title: "Preprocess_fibro_from10x"
+output: html_document
+author: "Wenjun Liu<br>Dame Roma Mitchell Cancer Research Laboratories<br>Adelaide Medical School<br>University of Adelaide"
+date: "2023-01-20"
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 10
+)
+```
+
+```{r packages}
+library(tidyverse)
+library(yaml)
+library(scales)
+library(pander)
+library(glue)
+library(edgeR)
+library(AnnotationHub)
+library(ensembldb)
+library(cowplot)
+library(ggfortify)
+library(magrittr)
+library(cqn)
+library(ggrepel)
+library(DT)
+library(Seurat)
+library(corrplot)
+library(plotly)
+library(patchwork)
+library(colorspace)
+library(ggpubr)
+library(randomcoloR)
+library(ggforce)
+library(MAST)
+library(pheatmap)
+library(BiocParallel)
+library(patchwork)
+library(biomartr)
+```
+
+```{r options}
+panderOptions("table.split.table", Inf)
+panderOptions("big.mark", ",")
+theme_set(
+    theme_bw() +
+              theme(
+                  panel.background = element_blank(), 
+                   panel.grid = element_blank()
+              ))
+```
+
+Color palettes used by most scRNA-seq methods could be found [here](https://rdrr.io/bioc/scater/src/R/plot_colours.R). 
+
+```{r}
+# sub_cols <- c("#729ECE", "#FF9E4A", "#67BF5C", "#ED665D", "#AD8BC9") %>%
+#     set_names(unique(seurat[[]]$prediction))
+patient_col <- c(
+    "MF61" = "#A71B4B", 
+    "MF43" = "#584B9F"
+)
+# scanpy colors were found in https://github.com/scverse/scanpy/blob/034ca2823804645e0d4874c9b16ba2eb8c13ac0f/scanpy/plotting/palettes.py
+treat_col <- c(
+  VEH = rgb(0.7, 0.7, 0.7),
+  DHT = rgb(0.8, 0.2, 0.2))
+sample_col <- hcl.colors(n = 4) %>%
+    set_names(c("mf43DHT", "mf43VEH", "mf61DHT", "mf61VEH"))
+```
+
+```{r ah}
+ah <- AnnotationHub() %>%
+  subset(rdataclass == "EnsDb") %>%
+  subset(str_detect(description, "101")) %>%
+  subset(genome == "GRCh38")
+stopifnot(length(ah) == 1)
+ensDb <- ah[[1]]
+```
+
+## Gene Annotations
+
+```{r genesGR}
+genesGR <- read_rds(here::here("data/genesGR.rds"))
+```
+
+
+# Load 10x data
+
+Outputs of the 10X `cellranger` pipelines were stored in different directories for cells derived from each of the four samples. Those raw reads were read in using the `Read10X()` function and made into individual`Seurat` object with the `min.cells` parameter set to 3 and `min.features` parameter set to 200 so only features detected in at least 3 cells and cells with at least 200 features within each sample were kept. 
+
+The 4 individual `Seurat` object were then combined to one using the `merge()` function. The merge step simply concatenates the counts and cell metadata together.Unique gens will also be added to the merged objects. 
+
+```{r Read10X}
+mf43DHT_rep1 <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf43/MF43_1/MF43_DHT-1/")
+mf43VEH_rep1 <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf43/MF43_1/MF43_VEH-1/")
+mf61DHT <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf61/MF61D1-G/")
+mf61VEH <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf61/MF61V1-G/")
+```
+
+```{r}
+mf43DHT <- CreateSeuratObject(counts = mf43DHT_rep1, project = "mf43DHT", min.cells = 3, min.features = 200)
+mf43VEH <- CreateSeuratObject(counts = mf43VEH_rep1, project = "mf43VEH", min.cells = 3, min.features = 200)
+mf61DHT <- CreateSeuratObject(counts = mf61DHT, project = "mf61DHT", min.cells = 3, min.features = 200)
+mf61VEH <- CreateSeuratObject(counts = mf61VEH, project = "mf61VEH", min.cells = 3, min.features = 200)
+fibroblast <- merge(mf43DHT, y = c(mf43VEH, mf61DHT, mf61VEH), project = "pilot_fibroblast")
+
+```
+
+
+The merged object contained data for `r nrow(fibroblast)` features across `r ncol(fibroblast)` cells. 
+
+# Preprocess
+
+```{r}
+fibroblast[["percent.mt"]] <- PercentageFeatureSet(fibroblast, pattern = "^MT-")
+```
+
+The QC metrics were plotted as a violin plot. 
+
+```{r, fig.cap="*Numers of features, total numbers of counts and percentages of mitocondrial counts for cells with in each sample.*", fig.height=5, fig.width=12}
+QCplot <- VlnPlot(fibroblast, 
+                  features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), 
+                  cols = sample_col,
+                  log = TRUE,
+                  ncol = 3, 
+                  group.by = "orig.ident", 
+                  combine = FALSE,
+                  pt.size = 0)  
+QCplot <- lapply(QCplot, function(x){x + guides(fill=guide_legend("Sample"))})
+names(QCplot) <- c("nFeature_RNA", "nCount_RNA", "percent.mt")
+(QCplot$nFeature_RNA & labs(y = "# of unique features/cell", x = "", title = "") |
+    QCplot$nCount_RNA & labs(y = "# of gene-wise counts/cell", x = "", title = "") |
+    QCplot$percent.mt & labs(y = "% of Mitochondrial counts/cell", x = "", title = "")) + 
+    plot_layout(guides = "collect") + 
+    plot_annotation(tag_levels = 'A')
+
+```
+
+Cells that have unique feature counts over 4,000 or less than 200 and ones have >5% mitochondrial counts were filtered out. 
+
+```{r}
+fibroblast <- subset(fibroblast, subset = nFeature_RNA > 200 & nFeature_RNA < 4000 & percent.mt < 5)
+```
+
+`r ncol(fibroblast)` cells passed the filtration criteria. 
+
+```{r}
+fibroblast$Sample <- fibroblast[[]]$orig.ident
+fibroblast$patient <- ifelse(str_detect(fibroblast[[]]$orig.ident, "mf43"), "MF43", "MF61")
+fibroblast$Treatment <- ifelse(str_detect(fibroblast[[]]$orig.ident, "DHT"), "DHT", "VEH")
+```
+
+Significantly higher numbers of cells were derived from the two MF61 samples. 
+
+```{r, fig.cap="*Numbers of cells in each samples, colored by treatment.Considerably more cells were from MF61.*"}
+NumOfCells <- fibroblast[[]] %>%
+    group_by(Treatment, patient, Sample) %>%
+    summarise(n = n()) %>%
+    ggplot(
+        aes(Sample, n, fill = Treatment)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(aes(label=n), vjust=1.6, color="white",
+              position = position_dodge(0.9), size=15) +
+    theme_minimal() +
+    labs(x = "",
+         y = "Number of Cells") +
+    # theme(
+    #     axis.text.x = element_text(size = 12, angle = 90)
+    # ) +
+    scale_fill_manual(values = treat_col)
+NumOfCells
+```
+## Normalise & featue selection & clustering
+
+Normalisation was performed to normalizes the feature expression measurements for each cell by the total expression, multiplies this by a scale factor (10,000 by default), and log-transforms the result. 
+```{r}
+fibroblast <- NormalizeData(fibroblast)
+```
+
+Feature selection was performed on the normalised object to only focus on the 2000 genes with top cell-to-cell variation in downstream analyses, and the 10 most highly variable genes were plotted on the variance-expression plot below. 
+
+```{r, fig.cap="*Variance-expression relationship for all genes where the top 2000 highly variable features were colored by red and the gene names of the top 10 features were labelled by text*"}
+fibroblast <- FindVariableFeatures(fibroblast, selection.method = "vst", nfeatures = 2000)
+marker <- head(VariableFeatures(fibroblast), 10)
+plot1 <- VariableFeaturePlot(fibroblast)
+plot2 <- LabelPoints(plot = plot1, points = marker, repel = TRUE)
+plot2
+```
+
+Next, the `ScaleData()` function was used to:
+
+- Shifts the expression of each gene, so that the mean expression across cells is 0
+- Scales the expression of each gene, so that the variance across cells is 1
+
+This step gives equal weight in downstream analyses, so that highly-expressed genes do not dominate
+
+```{r}
+all.genes <- rownames(fibroblast)
+fibroblast <- ScaleData(fibroblast, features = all.genes)
+```
+
+PCA was then performed on the scaled data. 
+
+```{r, fig.cap="*PCA plots of all fibroblast cells from the pilot study*"}
+fibroblast <- RunPCA(fibroblast, features = VariableFeatures(object = fibroblast))
+ DimPlot(fibroblast, 
+        reduction = "pca",
+        # group.by = "Treatment",
+        pt.size = 0.1
+        ) 
+```
+
+## Chose PCA component
+
+To choose how many PCA components to keep,  `DimHeatmap()` function was firstly used to visualise the source of heterogeneity in a dataset, where cells and features were ordered according to their PCA scores for each PCA component. 
+
+```{r, fig.height=15, fig.width=12}
+DimHeatmap(fibroblast, dims = 1:20, cells = 500, balanced = TRUE)
+```
+
+Then the elbow plot visualising a ranking of principle components based on the percentage of variance explained by each one was plotted. 
+
+```{r}
+ElbowPlot(fibroblast)
+```
+
+Based on the plots above, I chose to use the first 18 PCs. 
+
+## Cluster & Non-linear dimensional reduction {.tabset}
+
+Cells were clustered using `seurat`'s `FindNeighbors()` and `FindClusters()` function with `dims` set to 18 and `resolution` set to 0.3. 
+```{r}
+fibroblast <- FindNeighbors(fibroblast, dims = 1:18)
+fibroblast <- FindClusters(fibroblast, resolution = 0.3)
+```
+
+`r length(unique(Idents(fibroblast)))` unique clusters were identified. 
+
+Uniform manifold approximation and projection was perform for the cells and the dimensional reduction result was visualized. 
+
+```{r, fig.cap="*UMAP plot colored by clusters formed.*"}
+fibroblast <- RunUMAP(fibroblast, dims = 1:15)
+UMAP_clu <- DimPlot(fibroblast, reduction = "umap")
+UMAP_clu 
+```
+
+The pre-processed `Seurat` object was saved as an `RDS` file. 
+
+```{r}
+fibroblast$cluster <- Idents(fibroblast)
+saveRDS(fibroblast, file = here::here("output/fibroblast_seurat.rds"))
+```
+
+The UMAP plot was also colored by patient and treatment. 
+
+```{r, fig.height=6, fig.width=15, fig.cap="*UMAP plot colored by (L) patient and (R) treatment. The confounding effect of patient was still really strong.*"}
+umap_p <- DimPlot(fibroblast, 
+        reduction = "umap", 
+        group.by = "patient", 
+        pt.size = 0.1) +
+    scale_color_manual(
+        values = patient_col 
+    )+
+    ggtitle("")
+umap_t <- DimPlot(fibroblast, 
+        reduction = "umap", 
+        group.by = "Treatment", 
+        pt.size = 0.1
+        ) +
+    scale_color_manual(
+        values = treat_col
+    ) +
+    ggtitle("")
+UMAP_byPatient <- plot_grid(
+    umap_p, umap_t , 
+    labels = LETTERS[2:3],
+    hjust = -1.5,
+    vjust = 2
+)
+UMAP_byPatient
+```
+
+```{r}
+num_cell <- fibroblast[[]] %>%
+    group_by(cluster, patient, Treatment) %>%
+    summarise(
+        n = n() )%>%
+    ungroup() %>%
+    group_by(cluster) %>%
+    mutate(total = sum(n))
+```
+
+
+### Proportion by patient
+
+```{r, fig.cap="*Propotion of cells derived from each patient for each of the 6 cluster. Cluster 1 was mostly MF43 cells while all the other 5 cluster were predominantly MF61 cells*"}
+pie_ls <- num_cell %>%
+    group_by(patient, cluster) %>%
+    mutate(n_pass = sum(n)) %>%
+    ungroup() %>%
+    mutate(prop_pass = n_pass/total) %>%
+    dplyr::select(cluster, patient, prop_pass) %>%
+    unique()  %>%
+    split(f = .$cluster) %>%
+    lapply(function(x){
+        ggplot(
+            x, aes(x = "", y = prop_pass, fill = patient)
+        ) +
+            geom_bar(width = 1, stat = "identity") +
+            scale_fill_manual(values = patient_col, name = "Patient") + 
+            coord_polar("y", start=0) +
+            theme_void()  
+    })
+plot_grid(
+    plot_grid(
+        plotlist = pie_ls %>%
+            lapply(function(x){
+                x + theme(
+                    legend.position = "none"
+                )
+            }), 
+        labels = paste("Cluster ", 0:6, sep = ""), 
+        label_size = 12
+    ), 
+    get_legend(pie_ls[[1]]), 
+    rel_widths = c(9,1))
+```
+
+
+
+### Proportion by treatment
+
+```{r, fig.cap="*Propotion of cells derived from each traetment group for each of the 6 cluster. Apart from cluster 1, there are more vehicle cells than DHT-treated one in all clusters.*"}
+pie_ls2 <- num_cell %>%
+    group_by(Treatment, cluster) %>%
+    mutate(n_treat = sum(n)) %>%
+    ungroup() %>%
+    mutate(prop_treat = n_treat/total) %>%
+    dplyr::select(cluster, Treatment, prop_treat) %>%
+    unique()  %>%
+    split(f = .$cluster) %>%
+    lapply(function(x){
+        ggplot(
+            x, aes(x = "", y = prop_treat, fill = Treatment)
+        ) +
+            geom_bar(width = 1, stat = "identity") +
+            scale_fill_manual(values = treat_col) + 
+            coord_polar("y", start=0) +
+            theme_void() 
+    })
+plot_grid(
+    plotlist = pie_ls2, 
+    labels = paste("Cluster ", 0:5, sep = "")
+)
+```
+
+## {-}
+
+### Marker Selection {.tabset}
+
+Positive markers for every cluster compared to all remaining cells were found using the `FindAllMarkers()` function with `min.pct` set to 0.3 and `logfc.threshold` set to 1.2. The numbers of markers found for each cluster were:
+
+```{r, message=FALSE}
+cluster_marker <- FindAllMarkers(
+    fibroblast, min.pct = 0.3, logfc.threshold = 1.2, only.pos = TRUE
+)
+cluster_marker  %>%
+    split(f = .$cluster) %>%
+    vapply(nrow, integer(1)) %>%
+    pander()
+```
+
+Genes included in the heatmap are shown in the table below. 
+ 
+```{r}
+cluster_marker <- cluster_marker %>%
+    dplyr::select(cluster, gene_name = gene) %>%
+    left_join(
+        genes(ensDb) %>%
+            as.data.frame() %>%
+            dplyr::select(
+                gene_name, description, 
+                gene_id
+            ) %>%
+            mutate(
+                description = gsub("\\[.*?\\]", "", description)
+            )
+    ) %>%
+    unique() 
+# marker_GO <- getGO(
+#     organism = "Homo Sapiens", 
+#     genes = cluster_marker$gene_id,
+#     filters  = "ensembl_gene_id"
+# )
+cluster_marker %>%
+    dplyr::select(-gene_id) %>%
+    # dplyr::filter(cluster == "1") %>%
+    # pull(gene_name)
+    unique() %>%
+    mutate_all(as.factor) %>%
+    datatable(
+        filter = "top",
+        options = list(scrollY = '450px')
+    ) 
+```
+
+
+Expressions of all marker genes selected for each cluster combined were visualised as a heatmap. 
+
+```{r, fig.cap="*Expressions of marker genes selected for each cluster were visualised as a heatmap*", fig.height= 8, fig.width=12}
+marker_hp <- DoHeatmap(
+    fibroblast, 
+    features = cluster_marker$gene_name, 
+    # label = FALSE, 
+    group.by = "cluster", 
+    angle = 0, 
+    hjust = 0.5, 
+    size = 24,
+    group.bar.height = 0.05) 
+marker_hp
+```
+
+Expressions of the marker genes for each cluster were visualised using the `FeaturePlot()` function. 
+
+```{r}
+marker_list <- cluster_marker %>%
+    dplyr::select(cluster, gene_name) %>%
+    split(f = .$cluster) %>%
+    lapply(pull, gene_name) %>%
+    lapply(unique)
+names(marker_list) <- paste("Cluster", names(marker_list), sep = " ")
+marker_pl <- sapply(names(marker_list), function(x){
+    FeaturePlot(
+    fibroblast, features = marker_list[[x]]
+)
+}, simplify = FALSE)
+```
+
+```{r}
+cluster_cols <- hue_pal()(length(marker_pl))
+names(cluster_cols) <- names(marker_pl)
+UMAP_pl <- sapply(names(cluster_cols), function(x){
+    cols <- ifelse(names(cluster_cols) == x, cluster_cols[[x]], "gray")
+    DimPlot(
+        fibroblast, 
+        reduction = "umap",  
+        cols = cols
+    )
+}, simplify = FALSE)
+```
+
+```{r}
+cluster_ls <- sapply(names(marker_pl), function(x){
+    plot_grid(
+        marker_pl[[x]], 
+        UMAP_pl[[x]], 
+        nrow = 1, 
+        rel_widths = c(2, 1))
+}, simplify = FALSE)
+```
+
+```{r}
+htmltools::tagList(
+    lapply(names(cluster_ls), function(y){
+                        cp <- htmltools::tags$em(glue(
+                            "Expressions of the top 10 marker genes selected for cluster {y} on UMAP plots with a UMAP highlighting where cluster {y} cells locate. "
+                        ))
+                        htmltools::div(
+                            id = y,
+                            class="section level4",
+                            htmltools::h4(class = "tabset", y),
+                            htmltools::div(
+                                class = "figure", style = "text-align: center",
+                                htmltools::plotTag(cluster_ls[[y]], alt = "test", width = 1500, height = 1000),
+                                htmltools::p(
+                                    class = "caption", htmltools::tags$em(cp)
+                                )
+                            )
+                        )
+                    })
+                )
+```
+
+
+### Fibroblast sites of origin markers
+
+In the paper by [Morsing M, et al. 2016](https://pubmed.ncbi.nlm.nih.gov/27809866/), lobular human breast fibroblasts were found to be CD105high/CD26low while interlobular fibroblasts are CD105low/CD26high. 
+
+The expressions of the 2 genes across all cells were plotted: 
+
+```{r, fig.height=5, fig.width=15, fig.cap="*Expression of lobular fibroblast marker gene ENG(CD105) and interlobular fibroblast marker gene DPP4 (CD26) among all cells *"}
+library(flextable)
+eng <- FeaturePlot(
+    fibroblast, features = "ENG") +
+    ggtitle(
+        paste0("*ENG*", " (Lobular Fibroblast Marker)")
+    ) +
+    mdthemes::md_theme_classic() +
+    theme(
+        legend.position = "none"
+    )
+dpp4 <- FeaturePlot(
+    fibroblast, features = "DPP4") +
+   ggtitle(
+        paste0("*DPP4*", " (Interlobular Fibroblast Marker)")
+    ) +
+    mdthemes::md_theme_classic() 
+lobular_marker <- plot_grid(
+        eng, dpp4, 
+        nrow = 1
+    )
+lobular_marker
+```
+Most of the sequenced cells had a lobular origin, while only a small proportion of cells may have been interlobular. 
+
+# Thesis figures
+
+```{r}
+# # Table 1 number of cells per cluster
+# num_cell %>%
+#     dplyr::select(cluster, total) %>%
+#     mutate(cluster = paste("Cluster", cluster, sep = " ")) %>%
+#     unique() %>%
+#     ungroup() %>%
+#     add_row(
+#         summarise(
+#             ., 
+#             cluster = "Total", 
+#             total = sum(total)
+#         )
+#     ) %>%
+#     dplyr::rename(
+#         Cluster = cluster, 
+#         `Number of cells` = total
+#     ) %>%
+#     xtable::xtable(
+#         caption = "The numbers of cells assigned to each mammary fibroblasts snRNA-seq cluster.The numbers of cells assigned to each mammary fibroblasts snRNA-seq cluster. Clusters were identified through a shared nearest neighbor (SNN) modularity optimization based clustering algorithm provided by the Seurat's FindClusters function, with the resolution set to 0.3.",
+#         label = "chap5_table1"
+#     )  %>%
+#     print("~/PhD_thesis/draft_figure/chapter_05/table1.tex", type = "latex",
+#           caption.placement = "top",
+#           include.rownames = FALSE,
+#           # booktabs = TRUE
+#     )
+```
+
+
+```{r}
+## Table 2 (Marker genes defining each cluster)
+# library(kableExtra)
+# cluster_marker %>%
+#     mutate(
+#         cluster = paste("Cluster", cluster, sep = " "), 
+#         description = gsub("\\[.*\\]", "", description)
+#     ) %>%
+#     # left_join(
+#     #     kg
+#     # ) %>%
+#     dplyr::select(
+#         Cluster = cluster, 
+#         `Gene name` = gene_name, 
+#         Description = description,
+#         # `Gene-set name` = gs_name
+#     ) %>%
+#     unique() %>%
+#     xtable::xtable(
+#         caption = "Top marker genes selected for each cluster in the single-nucleus mammary gland fibroblast RNA-seq data]{The top 10 genes with the highest mean log2FC for clusters where more than 10 marker genes were detected, or all markers for clusters with a lower number of marker genes, along with each gene's description retrieved from Ensembl release 101.",
+#         label = "chap5_table1", 
+#         longtable = TRUE, 
+#         type = "latex",
+#         booktabs = TRUE
+#     )  %>%
+#     print("~/PhD_thesis/draft_figure/chapter_05/table2.tex",
+#           caption.placement = "top",
+#           type = "latex",
+#           include.rownames = FALSE
+#     )
+```
+
+```{r, fig.height=16, fig.width=18, fig.cap="*Figure 2. UMAP plots coloured by (A) clusters formed, (B) patient origin and (C) treatment, and (D) the numbers of useable cells detected in each sample. A cell was considered useable if it has >200 and <43,000 unique feature counts, in addition to <5% mitochondrial genes.*"}
+library(patchwork)
+chap5_fig2 <- ((UMAP_clu | plot_spacer()| umap_p) +
+                   plot_layout(
+                       widths = c(0.5,0.05, 0.45))) / 
+    ( umap_t | NumOfCells)  +
+    plot_annotation(
+        tag_levels = "A"
+    ) & 
+    theme(
+        # axis.title = element_text(size = 20), 
+        # legend.key.size = unit(1, 'cm'), 
+        # legend.text = element_text(size = 16), 
+        # legend.title = element_text(size = 18),
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" )
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig2.png",
+#     height = 2000,
+#     width = 2800)
+chap5_fig2
+# dev.off()
+```
+
+```{r, fig.height=10, fig.width=18, fig.cap="*Figure 3. UMAP plots showing the expressions of (A) lobular marker ENG and (B) interlobular marker DPP4.*"}
+# Figure 2 (marker genes)
+#     nrow = 2)
+chap5_fig3 <-  (eng | dpp4) +
+    plot_annotation(tag_levels = "A") & 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    )
+
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig3.png",
+#     height = 1400,
+#     width = 2800
+# )
+chap5_fig3
+# dev.off()
+```
+
+```{r}
+chap5_fig6 <- marker_hp +
+    guides(
+        color = "none"
+    ) +
+    theme(
+        text = element_text(size = 40), 
+        legend.key.size = unit(3, "cm"), 
+        panel.border = element_blank()
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig6.png",
+#     height = 2400,
+#     width = 2800
+# )
+# chap5_fig6
+# dev.off()
+```
+
+
+```{r, fig.height=10, fig.width=18, fig.cap="*Supp Fig 1. (A) Number of unique features, (B) total read counts and (C) mitochondrial gene proportions in cells derived from each of the fibroblast samples prior to filtration. Genes with non-zero reads in less than 3 cells and cells with <200 or >(43000) unique feature counts or >5% mitochondrial genes were filtered out.*"}
+# Supplementary Figure 1 (QC violin plots + elbow plot)
+
+chap5_sup1 <- ((QCplot$nFeature_RNA & labs(y = "# of unique features/cell", x = "", title = "") |
+    QCplot$nCount_RNA & labs(y = "# of total counts/cell", x = "", title = "")) )  / 
+    ((QCplot$percent.mt & labs(y = "% of Mitochondrial counts/cell", x = "", title = "") &
+          theme(
+              axis.title.y = element_text(size = 45)
+          ))  |
+         ElbowPlot(fibroblast) ) + 
+    plot_layout(guides = "collect") +
+    plot_annotation(tag_levels = 'A') &
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    ) +
+    theme(
+        axis.text = element_text(size = 35)
+    )
+png(
+    "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup1.png",
+    height = 1500,
+    width = 2000
+)
+chap5_sup1
+dev.off()
+```
+
+```{r, fig.height=5, fig.width=12, fig.cap="*Supp Fig 2. Numbers of fibroblast cells assigned to each cluster, grouped by (A) source of origin and (B) treatment.*"}
+bar_byPatient <- num_cell %>%
+    group_by(patient, cluster) %>%
+    mutate(n_pat = sum(n)) %>%
+    ungroup() %>%
+    ggplot(
+        aes(cluster, n_pat, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    # geom_text(aes(label=n), vjust=1.6, color="white",
+    #           position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = "Cluster",
+         y = "Number of Cells") +
+    scale_fill_manual(values = patient_col, 
+                      name = "Patient") +
+    theme(
+        panel.grid = element_blank(),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,10,-10,-10)
+    )
+bar_byTreat <- num_cell %>%
+    group_by(Treatment, cluster) %>%
+    mutate(n_treat = sum(n)) %>%
+    ungroup() %>%
+    ggplot(
+        aes(cluster, n_treat, fill = Treatment)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    # geom_text(aes(label=n), vjust=1.6, color="white",
+    #           position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = "Cluster",
+         y = "Number of Cells") +
+    scale_fill_manual(values = treat_col, 
+                      name = "Treatment") +
+    theme(
+        panel.grid = element_blank(), 
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,0,-10,-10)
+    )
+chap5_sup2 <- (bar_byPatient | bar_byTreat) + 
+    plot_layout(guides = "collect") +
+    plot_annotation(tag_levels = 'A') &
+    theme(
+        text = element_text(size = 50),
+        # axis.text.x = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup2.png",
+#     height = 1200,
+#     width = 2200
+# )
+chap5_sup2
+# dev.off()
+```
+# Seesion Information
+
+```{r}
+sessionInfo()
+```
+

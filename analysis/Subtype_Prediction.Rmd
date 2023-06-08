@@ -1,0 +1,545 @@
+---
+title: "Subtype_Prediction"
+output: html_document
+author: "Wenjun Liu<br>Dame Roma Mitchell Cancer Research Laboratories<br>Adelaide Medical School<br>University of Adelaide"
+date: "2023-01-29"
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 10
+)
+```
+
+```{r packages}
+library(tidyverse)
+library(yaml)
+library(scales)
+library(pander)
+library(glue)
+library(edgeR)
+library(AnnotationHub)
+library(ensembldb)
+library(cowplot)
+library(ggfortify)
+library(magrittr)
+library(cqn)
+library(ggrepel)
+library(DT)
+library(Seurat)
+library(corrplot)
+library(plotly)
+library(patchwork)
+library(colorspace)
+library(ggpubr)
+library(randomcoloR)
+library(ggforce)
+library(MAST)
+library(pheatmap)
+library(BiocParallel)
+library(SingleR)
+library(celldex)
+```
+
+```{r options}
+panderOptions("table.split.table", Inf)
+panderOptions("big.mark", ",")
+theme_set(theme_bw())
+```
+
+```{r formatP}
+formatP <- function(p, m = 0.0001){
+out <- rep("", length(p))
+out[p < m] <- sprintf("%.2e", p[p<m])
+out[p >= m] <- sprintf("%.4f", p[p>=m])
+out
+}
+```
+
+## Gene Annotations
+
+```{r ah}
+ah <- AnnotationHub() %>%
+  subset(rdataclass == "EnsDb") %>%
+  subset(str_detect(description, "101")) %>%
+  subset(genome == "GRCh38")
+stopifnot(length(ah) == 1)
+```
+
+```{r ensDb}
+ensDb <- ah[[1]]
+genesGR <- genes(ensDb)
+transGR <- transcripts(ensDb)
+```
+
+```{r addTxLen}
+mcols(transGR) <- mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+```
+
+```{r addGcLen2Genes}
+mcols(genesGR) <- mcols(genesGR) %>%
+  as.data.frame() %>%
+  dplyr::select(
+    gene_id, gene_name, gene_biotype, entrezid
+  ) %>%
+  left_join(
+    mcols(transGR) %>%
+      as.data.frame() %>%
+      mutate(
+        tx_support_level = case_when(
+          is.na(tx_support_level) ~ 1L, 
+          TRUE ~ tx_support_level
+        )
+      ) %>%
+      group_by(gene_id) %>%
+      summarise(
+        n_tx = n(),
+        longest_tx = max(tx_len),
+        ave_tx_len = mean(tx_len),
+        gc_content = sum(tx_len*gc_content) / sum(tx_len)
+      ) %>%
+      mutate(
+        bin_length = cut(
+          x = ave_tx_len,
+          labels = seq_len(10),
+          breaks = quantile(ave_tx_len, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin_gc = cut(
+          x = gc_content,
+          labels = seq_len(10),
+          breaks = quantile(gc_content, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin = paste(bin_gc, bin_length, sep = "_")
+      ),
+    by = "gene_id"
+  ) %>%
+  set_rownames(.$gene_id) %>%
+  as("DataFrame")
+```
+
+# Read in seurat object
+
+The pre-processed `seurat` object was loaded. 
+
+```{r}
+fibroblast <- readRDS(here::here("output/fibroblast_seurat.rds"))
+```
+
+
+```{r}
+# Color palettes used by most scRNA-seq methods could be found [here](https://rdrr.io/bioc/scater/src/R/plot_colours.R). 
+patient_col <- c(
+    "MF61" = "#A71B4B", 
+    "MF43" = "#584B9F"
+)
+# scanpy colors were found in https://github.com/scverse/scanpy/blob/034ca2823804645e0d4874c9b16ba2eb8c13ac0f/scanpy/plotting/palettes.py
+treat_col <- c(
+  VEH = rgb(0.7, 0.7, 0.7),
+  DHT = rgb(0.8, 0.2, 0.2))
+sample_col <- hcl.colors(n = 4) %>%
+    set_names(c("mf43DHT", "mf43VEH", "mf61DHT", "mf61VEH"))
+```
+
+# Use references from `celldex`
+
+The `celldex` package provides access to several reference datasets (mostly derived from bulk RNA-seq or microarray data) through dedicated retrieval functions. Here, we will use the Human Primary Cell Atlas (Mabbott et al. 2013), represented as a `SummarizedExperiment` object containing a matrix of log-expression values with sample-level labels.
+
+The HPCA reference consists of publicly available microarray datasets derived from human primary cells (Mabbott et al. 2013). Most of the labels refer to blood subpopulations but cell types from other tissues are also available. The main cell types and their associated reference numbers were:
+
+```{r}
+hpca.se <- HumanPrimaryCellAtlasData()
+table(colData(hpca.se)$label.main) %>%
+   enframe(
+       name = "Main cell type", 
+       value = "Number of reference"
+   ) %>%
+    mutate(
+        `Main cell type` = as.factor(`Main cell type`)
+    ) %>%
+    datatable(
+        filter = "top"
+    )
+```
+Each reference provides three levels of cell type annotation in its column metadata:
+
+- `label.main`, broad annotation that defines the major cell types. This has few unique levels that allows for fast annotation but at low resolution.
+- `label.fine`, fine-grained annotation that defines subtypes or states. This has more unique levels that results in slower annotation but at much higher resolution.
+- `label.ont`, fine-grained annotation mapped to the standard vocabulary in the Cell Ontology. This enables synchronization of labels across references as well as dynamic adjustment of the resolution.
+
+```{r}
+colData(hpca.se) %>%
+    as.data.frame() %>%
+    mutate_all(as.factor) %>%
+    datatable(
+        filter = "top"
+    )
+```
+
+The prediction of cell label was performed using the `SingleR()` function with the log-normed matrix as input for the test dataset. Since this is an unbiased cell type annotation analysis, all cell types were included in the reference datasetg. 
+
+```{r}
+seurat_count <- GetAssayData(object = fibroblast, slot = 'data')
+# pred_hpca <- SingleR(
+#     test = as.matrix(seurat_count), ref = hpca.se, labels = hpca.se$label.main
+# )
+# saveRDS(pred_hpca, here::here("output/pred_hpca.rds"))
+pred_hpca <- readRDS(here::here("output/pred_hpca.rds"))
+```
+
+Results of the prediction was visualised as a bar plot:
+
+```{r, fig.height=5, fig.width=12, fig.cap="*SingleR cell-type prediction results derived using the Human Primary Cell Atlas as a reference. The dominant cell type was fibroblast with mesenchymal stem cells and smooth muscle cells being 2nd and 3rd most abundant ones.*"}
+pred_hpca <- pred_hpca %>%
+    as.data.frame() %>%
+    rownames_to_column("cell") %>%
+    left_join(
+        fibroblast[[]] %>%
+    rownames_to_column("cell") 
+    ) 
+hpca_temp <- pred_hpca %>%
+    with(
+        ., table(patient, pruned.labels)
+    ) %>%
+    prop.table(margin = 1) %>%
+    as.data.frame() %>%
+    group_by(pruned.labels) %>%
+    mutate(
+        mean_freq = mean(Freq), 
+        pruned.labels = str_replace_all(pruned.labels, "_", " ")) %>%
+    .[order(.$mean_freq, decreasing = TRUE),] %>%
+    dplyr::filter(Freq > 0.0015) 
+predBar_hpca <- hpca_temp %>%
+    ggplot(
+        aes(factor(pruned.labels, levels = unique(hpca_temp$pruned.labels)), Freq, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust=-0.5, 
+              position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = "",
+         y = "Number of Cells") +
+    theme(
+        text = element_text(size = 18)
+    ) +
+    scale_fill_manual(values = patient_col, name = "Patient")
+predBar_hpca
+    ```
+
+# Use data from Wu, et al. 2020 as reference
+
+In the study published by [Wu et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32790115/), two cancer-associated fibroblast (CAF) and two perivascular-like (PVL) subpopulations were defined from the single-cell RNA sequencing data of five TNBCs cased. The log-normed count matrix and cell metadata of that dataset was downloaded from the [Broad Single Cell Portal](https://singlecell.broadinstitute.org/single_cell/study/SCP1106/stromal-cell-diversity-associated-with-immune-evasion-in-human-triple-negative-breast-cancer#study-download). 
+
+Since the scRNA-seq was performed on primary breast tumours using a marer-free approach, there were also epithelial and immune-related cells in this dataset. The numbers of cells in each annotaed cell type were:
+
+```{r}
+wu_cellMeta <- read_csv(here::here("data/Wu_2020/Wu_EMBO_metadata.csv"))
+wu_cellMeta <- wu_cellMeta[-1,]
+wu_normCount <- read_csv(here::here("data/Wu_2020/Wu_EMBO_countr_matrix.csv"))
+wu_normCount <- wu_normCount %>%
+    column_to_rownames("...1")
+wu_cellType <- wu_cellMeta %>%
+    .[match(.$NAME, colnames(wu_normCount)),] %>%
+    pull(celltype_final)
+wu_cellMeta %>%
+    group_by(celltype_final) %>%
+    summarise(n = n()) %>%
+    .[order(.$n, decreasing = TRUE), ] %>%
+    mutate(celltype_final = as.factor(celltype_final)) %>%
+    datatable(
+        filter = "top"
+    )
+```
+
+The prediction of cell type was performed using `SingleR` again, and the results were visualised as a barplot. 
+
+```{r}
+# pred_wu <- SingleR(
+#     test = as.matrix(seurat_count), ref = wu_normCount, labels = wu_cellType,
+#     de.method = "wilcox"
+# )
+# saveRDS(pred_wu, here::here("output/pred_wu.rds"))
+pred_wu <- readRDS(here::here("output/pred_wu.rds"))
+```
+
+```{r, fig.height=10, fig.width=12, fig.cap="*SingleR cell-type prediction results derived using scRNA-seq fibroblast data derived from Wu et. al 2020. Basically all cells were predicted to be myCAFs.*"}
+pred_wu <- pred_wu %>%
+    as.data.frame() %>%
+    rownames_to_column("cell") %>%
+    left_join(
+        fibroblast[[]] %>%
+    rownames_to_column("cell") 
+    ) 
+wu_temp <- pred_wu %>%
+    with(
+        ., table(patient, pruned.labels)
+    ) %>%
+    prop.table(margin = 1) %>%
+    as.data.frame() %>%
+            dplyr::filter(Freq > 0.0015) %>%
+    mutate(
+        pruned.labels = str_replace_all(pruned.labels, "_", " "))
+predBar_wu <- wu_temp %>%
+    ggplot(
+        aes(pruned.labels, Freq, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust= 0, 
+              position = position_dodge(0.9), size=10) +
+    theme_minimal() +
+    labs(x = "",
+         y = "Number of Cells") +
+    theme(
+        text = element_text(size = 30)
+    ) +
+    scale_fill_manual(values = patient_col, name = "Patient")
+predBar_wu
+```
+
+
+In the original study, the. myofibroblast-like CAFs (myCAFs) were classified by the expression of fibroblast-specific markers (PDGFRA, COL1A1, FAP and PDPN) + elevated expression of activated fibroblast markers (ACTA2, FAP and PDPN) and collagen-related genes (COL1A1 and COL1A2).
+
+```{r, fig.height=10, fig.width=12}
+fibroblast$hpca_pred <- pred_hpca %>%
+    .[match(rownames(fibroblast[[]]), pred_hpca$cell),] %>%
+    droplevels() %>%
+    pull(pruned.labels) 
+fibroblast$hpca_pred <- replace_na(fibroblast$hpca_pred, "Not labelled")
+p1 <- DimPlot(fibroblast, 
+        reduction = "umap", 
+        group.by = "hpca_pred", 
+        pt.size = 0.3
+        ) +
+    ggtitle("") +
+    scale_color_discrete_qualitative()
+fibroblast$CAF_pred <- pred_wu  %>%
+    .[match(rownames(fibroblast[[]]), pred_wu$cell),] %>%
+    droplevels() %>%
+    pull(pruned.labels) 
+fibroblast$CAF_pred  <- replace_na(fibroblast$CAF_pred , "Not labelled")
+p2 <- DimPlot(fibroblast, 
+        reduction = "umap", 
+        group.by = "CAF_pred", 
+        pt.size = 0.3
+        ) +
+    ggtitle("") +
+    scale_color_discrete_qualitative(palette = "Set 3")
+fibroblast$label_check  <- ifelse(
+    fibroblast$hpca_pred == "MSC" & fibroblast$CAF_pred == "Epithelial_Basal_Cycling", TRUE, FALSE
+)
+p3 <- DimPlot(fibroblast, 
+        reduction = "umap", 
+        group.by = "label_check", 
+        pt.size = 0.3
+        ) +
+    ggtitle("") +
+    scale_color_manual(
+        values = c(
+            "TRUE" = "red", 
+            "FALSE" = "gray"
+        ), 
+        name = "Classified as both\nMSC & basal"
+    )
+p4 <- fibroblast[[]] %>%
+    with(
+        ., table(cluster, label_check)
+    ) %>%
+    as.data.frame() %>%
+    ggplot(
+        aes(cluster, Freq, fill = label_check)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    # geom_text(aes(label=n), vjust=1.6, color="white",
+    #           position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = "Cluster",
+         y = "Number of Cells") +
+    scale_fill_manual(
+        values = c(
+            "TRUE" = "red", 
+            "FALSE" = "gray"
+        )
+    ) +
+    theme(
+        panel.grid = element_blank(), 
+        axis.text.x = element_text(size = 12),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,10,-10,-10)
+    )
+p1 + p2 + p3 + p4
+```
+
+
+
+# Thesis figure
+```{r}
+# Figure 4
+predBar_hpca <- hpca_temp %>%
+    ggplot(
+        aes(factor(pruned.labels, levels = unique(temp$pruned.labels)), Freq, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust=-0.2, 
+              position = position_dodge(0.9), size=15) +
+    theme_minimal() +
+    labs(x = "",
+         y = "Number of Cells") +
+    scale_fill_manual(values = patient_col, name = "Patient")
+predBar_wu <- wu_temp %>%
+    ggplot(
+        aes(pruned.labels, Freq, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(
+        aes(label=percent(Freq, accuracy = 0.01)), vjust= -0.2, 
+              position = position_dodge(0.9), size=15) +
+    theme_minimal() +
+    labs(x = "",
+         y = "Number of Cells") +
+    theme(
+        text = element_text(size = 30)
+    ) +
+    scale_fill_manual(values = patient_col, name = "Patient")
+chap5_fig4 <- (predBar_hpca / predBar_wu) +
+    plot_layout(guides = 'collect') +
+    plot_annotation(
+        tag_levels = "A"
+    ) & 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig4.png",
+#     height = 2000,
+#     width = 2800)
+# chap5_fig4
+# dev.off()
+```
+
+```{r, fig.height=15, fig.width=9}
+chap5_fig5 <- (p1 / p2 / p3) +
+    plot_annotation(
+        tag_levels = "A"
+    ) & 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig5.png",
+#     height = 1800,
+#     width = 1300)
+# chap5_fig5
+# dev.off()
+```
+
+
+```{r}
+library(knitr)
+library(kableExtra)
+temp <- table(colData(hpca.se)$label.main) %>%
+   enframe(
+       name = "HPCA cell type", 
+       value = "Number of reference data"
+   ) %>%
+    mutate(
+        `HPCA cell type` = str_replace_all(`HPCA cell type`, "_", " ")
+    ) %>%
+    .[order(.$`Number of reference data`, decreasing = TRUE),]
+temp %>%
+    xtable::xtable(
+        caption = "Numbers of reference microarray data available for each human primary cell type in the Human Primary Cell Atlas(HPCA) data.Numbers of reference microarray data available for each human primary cell type in the HPCA data retrieved using the celldex package.",
+        label = "chap5_supp_table1"
+    )  %>%
+    xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/supp_table1.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        add.to.row = list(
+            pos = list(which(temp$`HPCA cell type` == "Fibroblasts") - 1),
+            command = "\\rowfont{\\color{red}}"),
+        sanitize.text.function = function(x) x)
+
+```
+
+```{r}
+temp <- wu_cellMeta %>%
+    group_by(celltype_final) %>%
+    summarise(n = n()) %>%
+    .[order(.$n, decreasing = TRUE), ] %>%
+   dplyr::rename(
+       "Cell type" = celltype_final, 
+       "Number of cells" = n
+   ) %>%
+    mutate(
+        `Cell type` = str_replace_all(`Cell type`, "_", " ")
+    ) 
+temp %>%
+    xtable::xtable(
+        caption = "Numbers of different cell types detected in the the study by Wu et al. (2020)\\cite{wu_stromal_2020}.",
+        label = "chap5_supp_table2"
+    )  %>%
+    xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/supp_table2.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        add.to.row = list(
+            pos = as.list(which(temp$`Cell type` %in% c("iCAFs", "myCAFs", "dPVL", "imPVL")) - 1),
+            command = rep("\\rowfont{\\color{red}}", 4)),
+        sanitize.text.function = function(x) x)
+```
+
+```{r}
+acta2 <- seurat_count %>%
+    .["ACTA2",] %>%
+    enframe(
+        name = "cell", 
+        value = "Log-norm Count"
+    ) %>%
+    left_join(
+        fibroblast[[]] %>%
+            rownames_to_column("cell")
+    ) %>%
+    mutate(CAF_pred = str_replace_all(CAF_pred, "_", " ")) %>%
+    ggplot(
+        aes(CAF_pred, `Log-norm Count`, fill = CAF_pred)
+    ) +
+    geom_violin() +
+    theme_minimal() +
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+    labs(
+        x = ""
+    ) +
+    scale_fill_discrete_qualitative(palette = "Set 3", name = "Predicted Cell Type")
+epcam <- FeaturePlot(fibroblast, features = c("EPCAM")) +
+    ggtitle("")
+chap5_sup3 <- (acta2 / epcam) +
+    plot_annotation(
+        tag_levels = "A"
+    ) & 
+    theme(
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup3.png",
+#     height = 1900,
+#     width = 2100)
+# chap5_sup3
+# dev.off()
+```

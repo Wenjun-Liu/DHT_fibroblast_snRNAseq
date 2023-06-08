@@ -5,13 +5,16 @@ navbar:
   left:
   - text: Home
     href: index.html
-  - text: About
-    href: about.html
-  - text: License
-    href: license.html
+  - text: Pre-processing
+    href: Preprocess_fibro_from10x.html
+  - text: Cell Type Annotation
+    href: Subtype_Prediction.html
+  - text: Differential Expression & Pathway Analysis
+    href: Differential_Expression.html
 output:
   workflowr::wflow_html:
     toc: yes
     toc_float: yes
+    code_folding: hide
     theme: cosmo
     highlight: textmate

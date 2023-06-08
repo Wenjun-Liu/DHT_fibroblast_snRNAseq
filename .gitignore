@@ -2,10 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
-.Rapp.history
-.DS_Store
-analysis/figure
-analysis/*png
-analysis/*html
-analysis/*_cache
-analysis/site_libs
+data/*.h5ad
+data/seurat*
+data/sca.rds
+data/mf61/*
+data/mf43/*
+output/fibroblast_seurat.rds
+data/Wu_2020/*
