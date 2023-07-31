@@ -11,6 +11,10 @@ navbar:
     href: Subtype_Prediction.html
   - text: Differential Expression & Pathway Analysis
     href: Differential_Expression.html
+  - text: Data Integration
+    href: Data_Integration.html
+  - text: RNA Velocity
+    href: RNA_velocity.html
 output:
   workflowr::wflow_html:
     toc: yes

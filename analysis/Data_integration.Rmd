@@ -1,0 +1,564 @@
+---
+title: "Data_integration"
+output: html_document
+date: "2023-06-15"
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 10
+)
+```
+
+```{r packages}
+library(tidyverse)
+library(yaml)
+library(scales)
+library(pander)
+library(glue)
+library(edgeR)
+library(AnnotationHub)
+library(ensembldb)
+library(cowplot)
+library(ggfortify)
+library(magrittr)
+library(cqn)
+library(ggrepel)
+library(DT)
+library(Seurat)
+library(corrplot)
+library(plotly)
+library(patchwork)
+library(colorspace)
+library(ggpubr)
+library(randomcoloR)
+library(ggforce)
+library(MAST)
+library(pheatmap)
+library(BiocParallel)
+library(SingleR)
+library(celldex)
+```
+
+```{r options}
+panderOptions("table.split.table", Inf)
+panderOptions("big.mark", ",")
+theme_set(theme_bw())
+```
+
+```{r formatP}
+formatP <- function(p, m = 0.0001){
+out <- rep("", length(p))
+out[p < m] <- sprintf("%.2e", p[p<m])
+out[p >= m] <- sprintf("%.4f", p[p>=m])
+out
+}
+```
+
+## Gene Annotations
+
+```{r ah}
+ah <- AnnotationHub() %>%
+  subset(rdataclass == "EnsDb") %>%
+  subset(str_detect(description, "101")) %>%
+  subset(genome == "GRCh38")
+stopifnot(length(ah) == 1)
+```
+
+```{r ensDb}
+ensDb <- ah[[1]]
+genesGR <- genes(ensDb)
+transGR <- transcripts(ensDb)
+```
+
+```{r addTxLen}
+mcols(transGR) <- mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+```
+
+```{r addGcLen2Genes}
+mcols(genesGR) <- mcols(genesGR) %>%
+  as.data.frame() %>%
+  dplyr::select(
+    gene_id, gene_name, gene_biotype, entrezid
+  ) %>%
+  left_join(
+    mcols(transGR) %>%
+      as.data.frame() %>%
+      mutate(
+        tx_support_level = case_when(
+          is.na(tx_support_level) ~ 1L, 
+          TRUE ~ tx_support_level
+        )
+      ) %>%
+      group_by(gene_id) %>%
+      summarise(
+        n_tx = n(),
+        longest_tx = max(tx_len),
+        ave_tx_len = mean(tx_len),
+        gc_content = sum(tx_len*gc_content) / sum(tx_len)
+      ) %>%
+      mutate(
+        bin_length = cut(
+          x = ave_tx_len,
+          labels = seq_len(10),
+          breaks = quantile(ave_tx_len, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin_gc = cut(
+          x = gc_content,
+          labels = seq_len(10),
+          breaks = quantile(gc_content, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin = paste(bin_gc, bin_length, sep = "_")
+      ),
+    by = "gene_id"
+  ) %>%
+  set_rownames(.$gene_id) %>%
+  as("DataFrame")
+```
+
+
+```{r}
+# Color palettes used by most scRNA-seq methods could be found [here](https://rdrr.io/bioc/scater/src/R/plot_colours.R). 
+patient_col <- c(
+    "MF61" = "#A71B4B", 
+    "MF43" = "#584B9F"
+)
+# scanpy colors were found in https://github.com/scverse/scanpy/blob/034ca2823804645e0d4874c9b16ba2eb8c13ac0f/scanpy/plotting/palettes.py
+treat_col <- c(
+  VEH = rgb(0.7, 0.7, 0.7),
+  DHT = rgb(0.8, 0.2, 0.2))
+sample_col <- hcl.colors(n = 4) %>%
+    set_names(c("mf43DHT", "mf43VEH", "mf61DHT", "mf61VEH"))
+```
+
+# Load 10x data
+
+Outputs of the 10X `cellranger` pipelines were stored in different directories for cells derived from each of the four samples. Those raw reads were read in using the `Read10X()` function and made into individual`Seurat` object with the `min.cells` parameter set to 3 and `min.features` parameter set to 200 so only features detected in at least 3 cells and cells with at least 200 features within each sample were kept. 
+
+The 4 individual `Seurat` object were then combined to one using the `merge()` function. The merge step simply concatenates the counts and cell metadata together. Unique gens will also be added to the merged objects. 
+
+```{r Read10X, eval=FALSE}
+mf43DHT_rep1 <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf43/MF43_1/MF43_DHT-1/")
+mf43VEH_rep1 <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf43/MF43_1/MF43_VEH-1/")
+mf61DHT <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf61/MF61D1-G/")
+mf61VEH <- Read10X(data.dir = "~/pilot_fibroblast_scRNAseq/data/mf61/MF61V1-G/")
+```
+
+```{r, eval=FALSE}
+mf43DHT <- CreateSeuratObject(counts = mf43DHT_rep1, project = "mf43DHT", min.cells = 3, min.features = 200)
+mf43VEH <- CreateSeuratObject(counts = mf43VEH_rep1, project = "mf43VEH", min.cells = 3, min.features = 200)
+mf61DHT <- CreateSeuratObject(counts = mf61DHT, project = "mf61DHT", min.cells = 3, min.features = 200)
+mf61VEH <- CreateSeuratObject(counts = mf61VEH, project = "mf61VEH", min.cells = 3, min.features = 200)
+fibroblast <- merge(mf43DHT, y = c(mf43VEH, mf61DHT, mf61VEH), project = "pilot_fibroblast")
+fibroblast$Sample <- fibroblast[[]]$orig.ident
+fibroblast$patient <- ifelse(str_detect(fibroblast[[]]$orig.ident, "mf43"), "MF43", "MF61")
+fibroblast$Treatment <- ifelse(str_detect(fibroblast[[]]$orig.ident, "DHT"), "DHT", "VEH")
+```
+
+# Perform integration
+
+The merged `Seurat` object was then split to two sub objects by patients. Data normalisation and top 2000 most variable features' selections were conducted within each `Seurat` object independently. Additionally, features that are repeatedly variable across datasets for integration were selected using the `SelectIntegrationFeatures()` function.
+
+```{r, eval=FALSE}
+seurat_ls <- SplitObject(fibroblast, split.by = "patient")
+seurat_ls <- lapply(seurat_ls, function(x){
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+features <- SelectIntegrationFeatures(object.list = seurat_ls)
+anchors <- FindIntegrationAnchors(object.list = seurat_ls, anchor.features = features)
+fibroblast_combined <- IntegrateData(anchorset = anchors)
+DefaultAssay(fibroblast_combined) <- "integrated"
+#saveRDS(fibroblast_combined, here::here("output/fibroblast_combined.rds"))
+```
+```{r}
+fibroblast_combined <- readRDS(here::here("output/fibroblast_combined.rds"))
+```
+
+# Clustering on integrated data
+
+The integrated dataset was also scaled. PCA heatmaps and elbowplot were again used the determine the dimensionality of the dataset to be 18. 
+```{r}
+fibroblast_combined <- ScaleData(fibroblast_combined, verbose = FALSE)
+```
+
+```{r, message=FALSE}
+fibroblast_combined <- RunPCA(fibroblast_combined, features = VariableFeatures(object = fibroblast_combined))
+ElbowPlot(fibroblast_combined, ndims = 30)
+```
+
+```{r, fig.height=15, fig.width=12}
+DimHeatmap(fibroblast_combined, dims = 1:25, cells = 500, balanced = TRUE)
+```
+
+UMAP plots were generated to visualize the 5 clusters formed. 
+```{r}
+fibroblast_combined <- RunUMAP(fibroblast_combined, reduction = "pca", dims = 1:18)
+fibroblast_combined <- RunTSNE(fibroblast_combined, tsne.method = "Rtsne", dims = 1:18)
+fibroblast_combined <- FindNeighbors(fibroblast_combined, reduction = "pca", dims = 1:18)
+fibroblast_combined <- FindClusters(fibroblast_combined, resolution = 0.3)
+fibroblast_combined$cluster <- Idents(fibroblast_combined)
+```
+
+```{r}
+# saveRDS(pred_hpca_combined, here::here("output/pred_hpca_combined.rds"))
+```
+
+UMAP plots were generated to visualize the 5 clusters formed. 
+
+```{r, fig.width=20, fig.height=5}
+p1 <- DimPlot(fibroblast_combined, reduction = "umap", label = TRUE, repel = TRUE)
+p2 <- DimPlot(fibroblast_combined, reduction = "umap", group.by = "Treatment") +
+    scale_color_manual(values = treat_col) +
+    ggtitle("")
+p3 <- DimPlot(fibroblast_combined, reduction = "umap", group.by = "patient") +
+    scale_color_manual(values = patient_col) +
+    ggtitle("")
+p1 + p2 + p3
+```
+Although due to the large difference in the numbers of useable cells derived from each patient, three of the five formed clusters were still patient-driven, cluster 0 now has a similar numbers of cells from both patient. 
+
+```{r, fig.height=4, fig.cap="*Numbers of cells assigned to each cluster post data integration, grouped by patients.*"}
+num_cell <- fibroblast_combined[[]] %>%
+    group_by(cluster, patient, Treatment) %>%
+    summarise(
+        n = n() )%>%
+    ungroup() %>%
+    group_by(cluster) %>%
+    mutate(total = sum(n))
+num_cell %>%
+    group_by(patient, cluster) %>%
+    mutate(n_pat = sum(n)) %>%
+    ungroup() %>%
+    dplyr::select(cluster, patient, n_pat) %>%
+    unique() %>%
+     ggplot(
+        aes(cluster, n_pat, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(aes(label=n_pat), vjust=1.6, color="white",
+              position = position_dodge(0.9), size=3.5) +
+    theme_minimal() +
+    labs(x = "Cluster",
+         y = "Number of Cells") +
+    scale_fill_manual(values = patient_col, 
+                      name = "Patient") +
+    theme(
+        panel.grid = element_blank(),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,10,-10,-10)
+    )
+```
+
+```{r}
+# cluster_marker_raw <- read_csv(here::here("output/cluster_marker_unintegrated.csv"))
+# old_marker <- cluster_marker_raw %>%
+#     split(f = .$cluster) %>%
+#     lapply(function(x){x[order(x$avg_log2FC, decreasing = TRUE),]}) %>%
+#     lapply(function(x){x[1,]}) %>%
+#     lapply(pull,gene) %>%
+#     unlist(recursive = FALSE)
+# FeaturePlot(
+#     fibroblast_combined, features = old_marker)
+```
+
+## Compare to old clusters
+
+```{r}
+library(bluster)
+fibroblast <- readRDS(here::here("output/fibroblast_seurat.rds"))
+matched_cluster <- fibroblast[[]] %>%
+    rownames_to_column("cell") %>%
+    dplyr::select(cell, old = cluster, patient)  %>%
+    left_join(
+        fibroblast_combined[[]] %>%
+            rownames_to_column("cell") %>%
+            dplyr::select(cell, new = cluster)
+    )
+tab_61 <- nestedClusters(ref=paste("Pre-Cluster", matched_cluster$old[matched_cluster$patient == "MF61"]),
+    alt=paste("Post-Cluster",  matched_cluster$new[matched_cluster$patient == "MF61"]))
+hp61 <- ComplexHeatmap::pheatmap(tab_61$proportions, 
+         cluster_row=FALSE, 
+         cluster_col=FALSE, 
+         color = viridis_pal(option = "B")(10), 
+         main = "MF61", 
+         heatmap_legend_param = list(title = "Proportion"))
+tab_43 <- nestedClusters(ref=paste("Pre-Cluster", matched_cluster$old[matched_cluster$patient == "MF43"]),
+    alt=paste("Post-Cluster",  matched_cluster$new[matched_cluster$patient == "MF43"]))
+hp43 <- ComplexHeatmap::pheatmap(tab_43$proportions, 
+         cluster_row=FALSE, 
+         cluster_col=FALSE, 
+         color = viridis_pal(option = "B")(10), 
+         main = "MF43", 
+         legend = FALSE)
+ComplexHeatmap::draw(hp61 + hp43) 
+```
+
+# Fibroblast sites of origin markers
+
+In the paper by [Morsing M, et al. 2016](https://pubmed.ncbi.nlm.nih.gov/27809866/), lobular human breast fibroblasts were found to be CD105high/CD26low while interlobular fibroblasts are CD105low/CD26high. 
+
+In the un-integrated data, it was observed that ENG was highly expressed in most cells while DPP4's expression was consistently low. The expressions of the 2 genes across all cells post-integration were plotted as a sanity check. Still the expression patterns for the two genes are pretty homogeneous across all clusters. 
+
+```{r,fig.cap="*Post-integration expression of lobular fibroblast marker gene ENG(CD105) and interlobular fibroblast marker gene DPP4 (CD26) among all cells *", fig.height=4, fig.width=10}
+FeaturePlot(
+    fibroblast_combined, features = c("ENG", "DPP4")) 
+```
+
+# Subtype prediction 
+
+```{r}
+pred_hpca <- readRDS(here::here("output/pred_hpca.rds"))
+fibroblast_combined$old_hpca <- pred_hpca  %>%
+    as.data.frame() %>%
+    rownames_to_column("cell") %>%
+    .[match(rownames(fibroblast_combined[[]]), .$cell),] %>%
+    droplevels() %>%
+    pull(pruned.labels) %>%
+    replace_na("Not Labelled")
+pred_wu <- readRDS(here::here("output/pred_wu.rds"))
+fibroblast_combined$old_wu <- pred_wu  %>%
+    as.data.frame() %>%
+    rownames_to_column("cell") %>%
+    .[match(rownames(fibroblast_combined[[]]), .$cell),] %>%
+    droplevels() %>%
+    pull(pruned.labels) %>%
+    replace_na("Not Labelled")
+```
+
+```{r, fig.height=5, fig.width=12}
+p1 <- DimPlot(fibroblast_combined, 
+        reduction = "umap", 
+        group.by = "old_hpca", 
+        pt.size = 0.1
+        ) +
+    ggtitle("") +
+    scale_color_discrete_qualitative()
+p2 <- DimPlot(fibroblast_combined, 
+        reduction = "umap", 
+        group.by = "old_wu", 
+        pt.size = 0.1
+        ) +
+    ggtitle("") +
+    scale_color_discrete_qualitative(palette = "Set 3")
+p1 | p2
+```
+
+
+# Re-clustering cluster 0
+
+Cells assigned to cluster 0, which had similar numbers of cells from both patients, were re-culstered using the same parameters. 
+
+```{r}
+seurat_cluster0 <- subset(fibroblast_combined, subset = cluster == "0")
+```
+
+```{r}
+seurat_cluster0 <- RunUMAP(seurat_cluster0, reduction = "pca", dims = 1:18)
+seurat_cluster0 <- RunTSNE(seurat_cluster0, tsne.method = "Rtsne", dims = 1:18)
+seurat_cluster0 <- FindNeighbors(seurat_cluster0, reduction = "pca", dims = 1:18)
+seurat_cluster0<- FindClusters(seurat_cluster0, resolution = 0.3)
+seurat_cluster0$cluster <- Idents(seurat_cluster0)
+```
+
+3 sub-clusters were identified and they all had similar representations from both patients and treatment groups. 
+
+```{r, fig.width=20, fig.height=5}
+p1 <- DimPlot(seurat_cluster0, reduction = "umap", label = TRUE, repel = TRUE)
+p2 <- DimPlot(seurat_cluster0, reduction = "umap", group.by = "Treatment") +
+    scale_color_manual(values = treat_col) +
+    ggtitle("")
+p3 <- DimPlot(seurat_cluster0, reduction = "umap", group.by = "patient") +
+    scale_color_manual(values = patient_col) +
+    ggtitle("")
+p1 + p2 + p3
+```
+
+## Marker selection 
+
+```{r, message=FALSE}
+cluster_marker_cluster0<- FindAllMarkers(
+    seurat_cluster0, min.pct = 0.5, logfc.threshold = 0.7, only.pos = TRUE
+)
+cluster_marker_cluster0  %>%
+    split(f = .$cluster) %>%
+    vapply(nrow, integer(1)) %>%
+    pander()
+DoHeatmap(seurat_cluster0, features = cluster_marker_cluster0$gene) + 
+    NoLegend()
+```
+
+```{r}
+# new_marker <- cluster_marker_cluster0 %>%
+#     split(f = .$cluster) %>%
+#     lapply(function(x){x[order(x$avg_log2FC, decreasing = TRUE),]}) %>%
+#     lapply(function(x){x[1,]}) %>%
+#     lapply(pull,gene) %>%
+#     unlist(recursive = FALSE)
+# FeaturePlot(
+#     seurat_cluster0, features = new_marker)
+```
+# Thesis figures
+
+```{r}
+p1 <- DimPlot(fibroblast_combined, reduction = "umap", 
+              label = TRUE, repel = TRUE, 
+              pt.size = 0.2, label.size = 30)
+p2 <- DimPlot(fibroblast_combined, reduction = "umap", 
+              group.by = "Treatment", 
+              pt.size = 0.2) +
+    scale_color_manual(values = treat_col) +
+    ggtitle("")
+p3 <- DimPlot(fibroblast_combined, reduction = "umap", 
+              group.by = "patient", 
+              pt.size = 0.2) +
+    scale_color_manual(values = patient_col, 
+                       guide = "none") +
+    ggtitle("")
+p4 <- num_cell %>%
+    group_by(patient, cluster) %>%
+    mutate(n_pat = sum(n)) %>%
+    ungroup() %>%
+    dplyr::select(cluster, patient, n_pat) %>%
+    unique() %>%
+     ggplot(
+        aes(cluster, n_pat, fill = patient)
+    ) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    geom_text(aes(label=n_pat), vjust=0
+              , color="black",
+              position = position_dodge(0.9), size=12) +
+    theme_minimal() +
+    labs(x = "Cluster",
+         y = "Number of Cells") +
+    scale_fill_manual(values = patient_col, 
+                      name = "Patient") +
+    theme(
+        panel.grid = element_blank(),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(-10,10,-10,-10)
+    )
+chap5_fig7 <- ((p1 |p2 ) / (p3 | p4) ) +
+    plot_annotation(
+        tag_levels = "A"
+    ) & 
+    theme(
+        # axis.title = element_text(size = 20), 
+        # legend.key.size = unit(1, 'cm'), 
+        # legend.text = element_text(size = 16), 
+        # legend.title = element_text(size = 18),
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" )
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig7.png",
+#     height = 2000,
+#     width = 2800)
+# chap5_fig7
+# dev.off()
+```
+
+```{r}
+library(grid)
+hp61 <- ComplexHeatmap::pheatmap(tab_61$proportions, 
+         cluster_row=FALSE, 
+         cluster_col=FALSE, 
+         color = viridis_pal(option = "B")(10), 
+         main = "MF61", 
+         heatmap_legend_param = list(title = "Proportion",
+                                     title_gp = gpar(fontsize = 50),  # Font size of the legend title
+                                     labels_gp = gpar(fontsize = 40),  # Font size of the legend labels
+                                     grid_width = unit(2, "cm"), 
+                                     legend_height = unit(10, "cm"), 
+                                     at = c(0, 0.5, 1)),
+         fontsize = 40, 
+         cellwidth = 100, 
+         cellheight = 200,
+         row_names_side = "left")
+hp43 <- ComplexHeatmap::pheatmap(tab_43$proportions, 
+         cluster_row=FALSE, 
+         cluster_col=FALSE, 
+         color = viridis_pal(option = "B")(10), 
+         main = "MF43", 
+         legend = FALSE, 
+         fontsize = 40, 
+         cellwidth = 100, 
+         cellheight = 200, 
+         row_names_side = "left")
+# pdf(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup4.pdf",
+#     height = 20,
+#     width = 32)
+# ComplexHeatmap::draw(hp61 + hp43)
+# dev.off()
+```
+
+```{r}
+p1 <- DimPlot(seurat_cluster0, reduction = "umap", 
+              label = TRUE, repel = TRUE, label.size = 13,
+              pt.size = 1)
+p2 <- DimPlot(seurat_cluster0, reduction = "umap", 
+              group.by = "Treatment", 
+              pt.size = 1) +
+    scale_color_manual(values = treat_col) +
+    ggtitle("")
+p3 <- DimPlot(seurat_cluster0, reduction = "umap", 
+              group.by = "patient", 
+              pt.size = 1) +
+    scale_color_manual(values = patient_col) +
+    ggtitle("")
+chap5_sup5 <- (p1 | p2 | p3) +
+    plot_annotation(
+        tag_levels = "A"
+    ) & 
+    theme(
+        # axis.title = element_text(size = 20), 
+        legend.key.size = unit(2, 'cm'), 
+        # legend.text = element_text(size = 16), 
+        # legend.title = element_text(size = 18),
+        text = element_text(size = 35),
+        plot.tag = element_text(size = 55, face = "bold" )
+    )
+png(
+    "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup5.png",
+    height = 600,
+    width = 1800)
+chap5_sup5
+dev.off()
+```
+
+```{r}
+chap5_sup6 <- DoHeatmap(seurat_cluster0, features = cluster_marker_cluster0$gene, 
+          angle = 0, 
+          hjust = 0.5, 
+          size = 24,
+          group.bar.height = 0.05) + 
+    guides(
+        color = "none", 
+        fill = guide_legend(
+            "Scaled Log-Norm\nCount", 
+            reverse = TRUE)
+    ) +
+    theme(
+        text = element_text(size = 40), 
+        legend.key.size = unit(3, "cm"), 
+        panel.border = element_blank()
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup6.png",
+#     height = 2400,
+#     width = 2800
+# )
+# chap5_sup6
+# dev.off()
+```
+

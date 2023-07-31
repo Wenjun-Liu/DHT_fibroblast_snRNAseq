@@ -17,10 +17,16 @@ Complete processing and analysis of single-nucleus RNA-Seq data from human mamma
 1. Filtering, feature selection, normalization and scaling of all CellRanger outputs.
 2. Dimension reduction and clsutering of cells. 
 3. Selection of marker genes defining each cluster.
+
 + **Subtype_Prediction.Rmd**:
 1. Unbiased cell type annotation using SingleR.
+
 + **Differential_Expression.Rmd**:
-1. Differential expression analysis using MAST. 
-2. Differential expression analysis through pseudobulking + edgeR. 
-3. Pathway enrichment analysis using GOseq. 
+1. Global differential expression analysis. 
+2. Differential expression analyses within each cluster. 
+3. Cluster-specific pathway enrichment analysis using GOseq . 
+4. Scoring individual cells against stem cell signatures using AUCell.
+
++ **RNA_Velocity.ipynb**: 
+1. RNA velocity analysis using scVelo
 

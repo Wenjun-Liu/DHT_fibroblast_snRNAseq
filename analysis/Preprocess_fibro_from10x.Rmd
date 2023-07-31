@@ -246,7 +246,9 @@ Uniform manifold approximation and projection was perform for the cells and the 
 
 ```{r, fig.cap="*UMAP plot colored by clusters formed.*"}
 fibroblast <- RunUMAP(fibroblast, dims = 1:15)
-UMAP_clu <- DimPlot(fibroblast, reduction = "umap")
+UMAP_clu <- DimPlot(fibroblast, 
+                    reduction = "umap", label = TRUE, label.size = 16) + 
+    guides(colour = guide_legend(override.aes = list(size=10)))
 UMAP_clu 
 ```
 
@@ -254,7 +256,7 @@ The pre-processed `Seurat` object was saved as an `RDS` file.
 
 ```{r}
 fibroblast$cluster <- Idents(fibroblast)
-saveRDS(fibroblast, file = here::here("output/fibroblast_seurat.rds"))
+# saveRDS(fibroblast, file = here::here("output/fibroblast_seurat.rds"))
 ```
 
 The UMAP plot was also colored by patient and treatment. 
@@ -267,7 +269,8 @@ umap_p <- DimPlot(fibroblast,
     scale_color_manual(
         values = patient_col 
     )+
-    ggtitle("")
+    ggtitle("")  + 
+    guides(colour = guide_legend(override.aes = list(size=10)))
 umap_t <- DimPlot(fibroblast, 
         reduction = "umap", 
         group.by = "Treatment", 
@@ -276,7 +279,8 @@ umap_t <- DimPlot(fibroblast,
     scale_color_manual(
         values = treat_col
     ) +
-    ggtitle("")
+    ggtitle("")  + 
+    guides(colour = guide_legend(override.aes = list(size=10)))
 UMAP_byPatient <- plot_grid(
     umap_p, umap_t , 
     labels = LETTERS[2:3],
@@ -370,6 +374,7 @@ Positive markers for every cluster compared to all remaining cells were found us
 cluster_marker <- FindAllMarkers(
     fibroblast, min.pct = 0.3, logfc.threshold = 1.2, only.pos = TRUE
 )
+#write_csv(cluster_marker, here::here("output/cluster_marker_unintegrated.csv"))
 cluster_marker  %>%
     split(f = .$cluster) %>%
     vapply(nrow, integer(1)) %>%
@@ -411,6 +416,7 @@ cluster_marker %>%
 ```
 
 
+
 Expressions of all marker genes selected for each cluster combined were visualised as a heatmap. 
 
 ```{r, fig.cap="*Expressions of marker genes selected for each cluster were visualised as a heatmap*", fig.height= 8, fig.width=12}
@@ -421,70 +427,9 @@ marker_hp <- DoHeatmap(
     group.by = "cluster", 
     angle = 0, 
     hjust = 0.5, 
-    size = 24,
+    size = 6,
     group.bar.height = 0.05) 
 marker_hp
-```
-
-Expressions of the marker genes for each cluster were visualised using the `FeaturePlot()` function. 
-
-```{r}
-marker_list <- cluster_marker %>%
-    dplyr::select(cluster, gene_name) %>%
-    split(f = .$cluster) %>%
-    lapply(pull, gene_name) %>%
-    lapply(unique)
-names(marker_list) <- paste("Cluster", names(marker_list), sep = " ")
-marker_pl <- sapply(names(marker_list), function(x){
-    FeaturePlot(
-    fibroblast, features = marker_list[[x]]
-)
-}, simplify = FALSE)
-```
-
-```{r}
-cluster_cols <- hue_pal()(length(marker_pl))
-names(cluster_cols) <- names(marker_pl)
-UMAP_pl <- sapply(names(cluster_cols), function(x){
-    cols <- ifelse(names(cluster_cols) == x, cluster_cols[[x]], "gray")
-    DimPlot(
-        fibroblast, 
-        reduction = "umap",  
-        cols = cols
-    )
-}, simplify = FALSE)
-```
-
-```{r}
-cluster_ls <- sapply(names(marker_pl), function(x){
-    plot_grid(
-        marker_pl[[x]], 
-        UMAP_pl[[x]], 
-        nrow = 1, 
-        rel_widths = c(2, 1))
-}, simplify = FALSE)
-```
-
-```{r}
-htmltools::tagList(
-    lapply(names(cluster_ls), function(y){
-                        cp <- htmltools::tags$em(glue(
-                            "Expressions of the top 10 marker genes selected for cluster {y} on UMAP plots with a UMAP highlighting where cluster {y} cells locate. "
-                        ))
-                        htmltools::div(
-                            id = y,
-                            class="section level4",
-                            htmltools::h4(class = "tabset", y),
-                            htmltools::div(
-                                class = "figure", style = "text-align: center",
-                                htmltools::plotTag(cluster_ls[[y]], alt = "test", width = 1500, height = 1000),
-                                htmltools::p(
-                                    class = "caption", htmltools::tags$em(cp)
-                                )
-                            )
-                        )
-                    })
-                )
 ```
 
 
@@ -492,32 +437,118 @@ htmltools::tagList(
 
 In the paper by [Morsing M, et al. 2016](https://pubmed.ncbi.nlm.nih.gov/27809866/), lobular human breast fibroblasts were found to be CD105high/CD26low while interlobular fibroblasts are CD105low/CD26high. 
 
-The expressions of the 2 genes across all cells were plotted: 
+The expressions of the 2 genes were compared across all cells.
 
-```{r, fig.height=5, fig.width=15, fig.cap="*Expression of lobular fibroblast marker gene ENG(CD105) and interlobular fibroblast marker gene DPP4 (CD26) among all cells *"}
-library(flextable)
-eng <- FeaturePlot(
-    fibroblast, features = "ENG") +
-    ggtitle(
-        paste0("*ENG*", " (Lobular Fibroblast Marker)")
+```{r}
+seurat_count <- GetAssayData(object = fibroblast, slot = 'data')
+temp <- seurat_count %>%
+    .[rownames(.) %in% c("ENG", "DPP4"),] %>%
+    as.matrix() %>%
+    t() %>%
+    as.data.frame() %>%
+    rownames_to_column("cell") %>%
+    left_join(
+        fibroblast[[]] %>%
+            rownames_to_column("cell")
+    ) %>%
+    mutate(
+        label = case_when(
+            DPP4 == 0 & ENG != 0 ~ "Intra-lobular", 
+            DPP4 != 0 & ENG == 0 ~ "Inter-lobular"),
+         label = ifelse(
+             is.na(label), "Undefinitive", label
+         )
+    ) 
+fibroblast$location_label <- temp %>%
+    .[match(colnames(fibroblast), .$cell),] %>%
+    pull(label)
+```
+
+```{r}
+chap5_3a <- temp %>%
+    pivot_longer(
+        cols = c("DPP4", "ENG"),
+        names_to = "gene_name", 
+        values_to = "Log-norm Count"
+    ) %>%
+    mutate(
+        gene_name = ifelse(
+            gene_name == "ENG", "*ENG*", "*DPP4*"
+        )
+    ) %>%
+    ggplot(
+        aes(gene_name, `Log-norm Count`, fill = patient)
+    ) +
+    geom_boxplot() +
+    scale_fill_manual(
+        values = patient_col, 
+        name = "Patient"
     ) +
     mdthemes::md_theme_classic() +
+        xlab("") 
+temp <- temp %>%
+    group_by(label) %>%
+    mutate(
+        n = n(), 
+        label_n = paste(label,"\n(", comma(n), " cells)", sep = "")) 
+chap5_3b <- temp %>%
+    ggplot(
+        aes(ENG, DPP4, color = label)
+    ) +
+    geom_point() +
+    scale_color_manual(
+        values = c(
+            "Intra-lobular" = "#ACA4E2", 
+            "Inter-lobular" = "#5CBD92", 
+            "Undefinitive" = "gray"
+        ), 
+        name = "Subtype"
+    ) +
+    labs(
+        x = "Log-norm Count (*ENG*)",
+        y = "Log-norm Count (*DPP4*)"
+    ) +
+    geom_abline(slope = 1,
+                size = 2, 
+                linetype = "dashed", 
+                color = "black") +
+    mdthemes::md_theme_classic() +
+    geom_mark_ellipse(
+        aes( label = label_n, color = label),
+        size = 3,
+        label.fontsize = 14,
+        con.size = 3
+    ) +
     theme(
         legend.position = "none"
-    )
-dpp4 <- FeaturePlot(
-    fibroblast, features = "DPP4") +
-   ggtitle(
-        paste0("*DPP4*", " (Interlobular Fibroblast Marker)")
+    ) + 
+    guides(colour = guide_legend(override.aes = list(size=10)))
+chap5_3c <- DimPlot(fibroblast, group.by = "location_label", pt.size = 1.5) +
+    scale_color_manual(
+        values = c(
+            "Intra-lobular" = "#ACA4E2", 
+            "Inter-lobular" = "#5CBD92", 
+            "Undefinitive" = "gray"
+        ), 
+        name = "Subtype"
     ) +
-    mdthemes::md_theme_classic() 
-lobular_marker <- plot_grid(
-        eng, dpp4, 
-        nrow = 1
-    )
-lobular_marker
+    ggtitle("")  + 
+    guides(colour = guide_legend(override.aes = list(size=10)))
 ```
-Most of the sequenced cells had a lobular origin, while only a small proportion of cells may have been interlobular. 
+
+```{r, fig.height=10, fig.width=14, fig.cap="*Figure 3. UMAP plots showing the expressions of (A) lobular marker ENG and (B) interlobular marker DPP4.*"}
+(((chap5_3a + labs(tag = 'A')) / (chap5_3c + labs(tag = 'C'))) | (chap5_3b + labs(tag = 'B'))) +
+    plot_layout(
+        guides = "collect", 
+        widths = c(0.4, 0.6)) &
+    theme(
+        text = element_text(size = 12),
+        plot.tag = element_text(size = 20, face = "bold" ), 
+        legend.key.size = unit(2, "cm")
+    ) 
+```
+
+Most of the sequenced cells were predicted to have either a intra-lobular origin or undefinitive, while only a small proportion of cells may have been interlobular. 
 
 # Thesis figures
 
@@ -584,157 +615,260 @@ Most of the sequenced cells had a lobular origin, while only a small proportion 
 ```
 
 ```{r, fig.height=16, fig.width=18, fig.cap="*Figure 2. UMAP plots coloured by (A) clusters formed, (B) patient origin and (C) treatment, and (D) the numbers of useable cells detected in each sample. A cell was considered useable if it has >200 and <43,000 unique feature counts, in addition to <5% mitochondrial genes.*"}
-library(patchwork)
-chap5_fig2 <- ((UMAP_clu | plot_spacer()| umap_p) +
-                   plot_layout(
-                       widths = c(0.5,0.05, 0.45))) / 
-    ( umap_t | NumOfCells)  +
-    plot_annotation(
-        tag_levels = "A"
-    ) & 
-    theme(
-        # axis.title = element_text(size = 20), 
-        # legend.key.size = unit(1, 'cm'), 
-        # legend.text = element_text(size = 16), 
-        # legend.title = element_text(size = 18),
-        text = element_text(size = 50),
-        plot.tag = element_text(size = 55, face = "bold" )
-    )
+# library(patchwork)
+# chap5_fig2 <- ((UMAP_clu | plot_spacer()| umap_p) +
+#                    plot_layout(
+#                        widths = c(0.5,0.05, 0.45))) / 
+#     ( umap_t | NumOfCells)  +
+#     plot_annotation(
+#         tag_levels = "A"
+#     ) & 
+#     theme(
+#         # axis.title = element_text(size = 20), 
+#         # legend.key.size = unit(1, 'cm'), 
+#         # legend.text = element_text(size = 16), 
+#         # legend.title = element_text(size = 18),
+#         text = element_text(size = 50),
+#         plot.tag = element_text(size = 55, face = "bold" )
+#     )
 # png(
 #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig2.png",
 #     height = 2000,
 #     width = 2800)
-chap5_fig2
-# dev.off()
-```
-
-```{r, fig.height=10, fig.width=18, fig.cap="*Figure 3. UMAP plots showing the expressions of (A) lobular marker ENG and (B) interlobular marker DPP4.*"}
-# Figure 2 (marker genes)
-#     nrow = 2)
-chap5_fig3 <-  (eng | dpp4) +
-    plot_annotation(tag_levels = "A") & 
-    theme(
-        text = element_text(size = 50),
-        plot.tag = element_text(size = 55, face = "bold" ), 
-        legend.key.size = unit(2, "cm")
-    )
-
-# png(
-#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig3.png",
-#     height = 1400,
-#     width = 2800
-# )
-chap5_fig3
+# chap5_fig2
 # dev.off()
 ```
 
 ```{r}
-chap5_fig6 <- marker_hp +
-    guides(
-        color = "none"
-    ) +
-    theme(
-        text = element_text(size = 40), 
-        legend.key.size = unit(3, "cm"), 
-        panel.border = element_blank()
-    )
-# png(
-#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig6.png",
-#     height = 2400,
-#     width = 2800
-# )
-# chap5_fig6
-# dev.off()
+# seurat_count <- GetAssayData(object = fibroblast, slot = 'data')
+# temp <- seurat_count %>%
+#     .[rownames(.) %in% c("ENG", "DPP4"),] %>%
+#     as.matrix() %>%
+#     t() %>%
+#     as.data.frame() %>%
+#     rownames_to_column("cell") %>%
+#     left_join(
+#         fibroblast[[]] %>%
+#             rownames_to_column("cell")
+#     ) %>%
+#     mutate(
+#         label = case_when(
+#             DPP4 == 0 & ENG != 0 ~ "Intra-lobular", 
+#             DPP4 != 0 & ENG == 0 ~ "Inter-lobular"),
+#          label = ifelse(
+#              is.na(label), "Undefinitive", label
+#          )
+#     ) 
+# fibroblast$location_label <- temp %>%
+#     .[match(colnames(fibroblast), .$cell),] %>%
+#     pull(label)
+```
+
+```{r}
+# chap5_3a <- temp %>%
+#     pivot_longer(
+#         cols = c("DPP4", "ENG"),
+#         names_to = "gene_name", 
+#         values_to = "Log-norm Count"
+#     ) %>%
+#     mutate(
+#         gene_name = ifelse(
+#             gene_name == "ENG", "*ENG*", "*DPP4*"
+#         )
+#     ) %>%
+#     ggplot(
+#         aes(gene_name, `Log-norm Count`, fill = patient)
+#     ) +
+#     geom_boxplot() +
+#     scale_fill_manual(
+#         values = patient_col, 
+#         name = "Patient"
+#     ) +
+#     mdthemes::md_theme_classic() +
+#         xlab("") 
+# temp <- temp %>%
+#     group_by(label) %>%
+#     mutate(
+#         n = n(), 
+#         label_n = paste(label,"\n(", comma(n), " cells)", sep = "")) 
+# chap5_3b <- temp %>%
+#     ggplot(
+#         aes(ENG, DPP4, color = label)
+#     ) +
+#     geom_point() +
+#     scale_color_manual(
+#         values = c(
+#             "Intra-lobular" = "#ACA4E2", 
+#             "Inter-lobular" = "#5CBD92", 
+#             "Undefinitive" = "gray"
+#         ), 
+#         name = "Subtype"
+#     ) +
+#     labs(
+#         x = "Log-norm Count (*ENG*)",
+#         y = "Log-norm Count (*DPP4*)"
+#     ) +
+#     geom_abline(slope = 1,
+#                 size = 2, 
+#                 linetype = "dashed", 
+#                 color = "black") +
+#     mdthemes::md_theme_classic() +
+#     geom_mark_ellipse(
+#         aes( label = label_n, color = label),
+#         size = 3,
+#         label.fontsize = 28,
+#         con.size = 3
+#     ) +
+#     theme(
+#         legend.position = "none"
+#     ) + 
+#     guides(colour = guide_legend(override.aes = list(size=10)))
+# chap5_3c <- DimPlot(fibroblast, group.by = "location_label", pt.size = 1.5) +
+#     scale_color_manual(
+#         values = c(
+#             "Intra-lobular" = "#ACA4E2", 
+#             "Inter-lobular" = "#5CBD92", 
+#             "Undefinitive" = "gray"
+#         ), 
+#         name = "Subtype"
+#     ) +
+#     ggtitle("")  + 
+#     guides(colour = guide_legend(override.aes = list(size=10)))
+```
+
+```{r, fig.height=10, fig.width=18, fig.cap="*Figure 3. UMAP plots showing the expressions of (A) lobular marker ENG and (B) interlobular marker DPP4.*"}
+# chap5_fig3 <-  (((chap5_3a + labs(tag = 'A')) / (chap5_3c + labs(tag = 'C'))) | (chap5_3b + labs(tag = 'B'))) +
+#     plot_layout(
+#         guides = "collect", 
+#         widths = c(0.4, 0.6)) &
+#     theme(
+#         text = element_text(size = 28),
+#         plot.tag = element_text(size = 35, face = "bold" ), 
+#         legend.key.size = unit(2, "cm")
+#     ) 
+# # png(
+# #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig3.png",
+# #     width = 700, height =350, units='mm', res = 300
+# # )
+# # chap5_fig3
+# # dev.off()
+```
+
+
+
+```{r}
+# chap5_fig6 <- marker_hp +
+#     guides(
+#         color = "none", 
+#         fill = guide_legend(
+#             "Scaled Log-Norm\nCount", 
+#             reverse = TRUE)
+#     ) +
+#     theme(
+#         text = element_text(size = 40), 
+#         legend.key.size = unit(3, "cm"), 
+#         panel.border = element_blank()
+#     )
+# # png(
+# #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig6.png",
+# #     height = 2400,
+# #     width = 2800
+# # )
+# # chap5_fig6
+# # dev.off()
 ```
 
 
 ```{r, fig.height=10, fig.width=18, fig.cap="*Supp Fig 1. (A) Number of unique features, (B) total read counts and (C) mitochondrial gene proportions in cells derived from each of the fibroblast samples prior to filtration. Genes with non-zero reads in less than 3 cells and cells with <200 or >(43000) unique feature counts or >5% mitochondrial genes were filtered out.*"}
-# Supplementary Figure 1 (QC violin plots + elbow plot)
-
-chap5_sup1 <- ((QCplot$nFeature_RNA & labs(y = "# of unique features/cell", x = "", title = "") |
-    QCplot$nCount_RNA & labs(y = "# of total counts/cell", x = "", title = "")) )  / 
-    ((QCplot$percent.mt & labs(y = "% of Mitochondrial counts/cell", x = "", title = "") &
-          theme(
-              axis.title.y = element_text(size = 45)
-          ))  |
-         ElbowPlot(fibroblast) ) + 
-    plot_layout(guides = "collect") +
-    plot_annotation(tag_levels = 'A') &
-    theme(
-        text = element_text(size = 50),
-        plot.tag = element_text(size = 55, face = "bold" ), 
-        legend.key.size = unit(2, "cm")
-    ) +
-    theme(
-        axis.text = element_text(size = 35)
-    )
-png(
-    "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup1.png",
-    height = 1500,
-    width = 2000
-)
-chap5_sup1
-dev.off()
+# # Supplementary Figure 1 (QC violin plots + elbow plot)
+# 
+# chap5_sup1 <- ((QCplot$nFeature_RNA & labs(y = "# of unique features/cell", x = "", title = "") |
+#     QCplot$nCount_RNA & labs(y = "# of total counts/cell", x = "", title = "")) )  / 
+#     ((QCplot$percent.mt & labs(y = "% of Mitochondrial counts/cell", x = "", title = "") &
+#           theme(
+#               axis.title.y = element_text(size = 45)
+#           ))  |
+#          ElbowPlot(fibroblast) &
+#           theme(
+#               axis.title.x = element_text(vjust = 9)
+#           )) + 
+#     plot_layout(guides = "collect") +
+#     plot_annotation(tag_levels = 'A') &
+#     theme(
+#         text = element_text(size = 50),
+#         plot.tag = element_text(size = 55, face = "bold" ), 
+#         legend.key.size = unit(2, "cm")
+#     ) +
+#     theme(
+#         axis.text = element_text(size = 35)
+#     )
+# # png(
+# #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup1.png",
+# #     height = 1700,
+# #     width = 2200
+# # )
+# # chap5_sup1
+# # dev.off()
 ```
 
 ```{r, fig.height=5, fig.width=12, fig.cap="*Supp Fig 2. Numbers of fibroblast cells assigned to each cluster, grouped by (A) source of origin and (B) treatment.*"}
-bar_byPatient <- num_cell %>%
-    group_by(patient, cluster) %>%
-    mutate(n_pat = sum(n)) %>%
-    ungroup() %>%
-    ggplot(
-        aes(cluster, n_pat, fill = patient)
-    ) +
-    geom_bar(stat="identity", position=position_dodge()) +
-    # geom_text(aes(label=n), vjust=1.6, color="white",
-    #           position = position_dodge(0.9), size=3.5) +
-    theme_minimal() +
-    labs(x = "Cluster",
-         y = "Number of Cells") +
-    scale_fill_manual(values = patient_col, 
-                      name = "Patient") +
-    theme(
-        panel.grid = element_blank(),
-        legend.margin=margin(0,0,0,0),
-        legend.box.margin=margin(-10,10,-10,-10)
-    )
-bar_byTreat <- num_cell %>%
-    group_by(Treatment, cluster) %>%
-    mutate(n_treat = sum(n)) %>%
-    ungroup() %>%
-    ggplot(
-        aes(cluster, n_treat, fill = Treatment)
-    ) +
-    geom_bar(stat="identity", position=position_dodge()) +
-    # geom_text(aes(label=n), vjust=1.6, color="white",
-    #           position = position_dodge(0.9), size=3.5) +
-    theme_minimal() +
-    labs(x = "Cluster",
-         y = "Number of Cells") +
-    scale_fill_manual(values = treat_col, 
-                      name = "Treatment") +
-    theme(
-        panel.grid = element_blank(), 
-        legend.margin=margin(0,0,0,0),
-        legend.box.margin=margin(-10,0,-10,-10)
-    )
-chap5_sup2 <- (bar_byPatient | bar_byTreat) + 
-    plot_layout(guides = "collect") +
-    plot_annotation(tag_levels = 'A') &
-    theme(
-        text = element_text(size = 50),
-        # axis.text.x = element_text(size = 50),
-        plot.tag = element_text(size = 55, face = "bold" ), 
-        legend.key.size = unit(2, "cm")
-    )
-# png(
-#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup2.png",
-#     height = 1200,
-#     width = 2200
-# )
-chap5_sup2
-# dev.off()
+# bar_byPatient <- num_cell %>%
+#     group_by(patient, cluster) %>%
+#     mutate(n_pat = sum(n)) %>%
+#     ungroup() %>%
+#     ggplot(
+#         aes(cluster, n_pat, fill = patient)
+#     ) +
+#     geom_bar(stat="identity", position=position_dodge()) +
+#     theme_minimal() +
+#     labs(x = "Cluster",
+#          y = "Number of Cells") +
+#     scale_fill_manual(values = patient_col, 
+#                       name = "Patient") +
+#     theme(
+#         panel.grid = element_blank(),
+#         legend.margin=margin(0,0,0,0),
+#         legend.box.margin=margin(-10,10,-10,-10)
+#     )
+# bar_byTreat <- num_cell %>%
+#     group_by(Treatment, cluster) %>%
+#     mutate(n_treat = sum(n)) %>%
+#     ungroup() %>%
+#     ggplot(
+#         aes(cluster, n_treat, fill = Treatment)
+#     ) +
+#     geom_bar(stat="identity", position=position_dodge()) +
+#     # geom_text(aes(label=n_treat), vjust=1.6, color="white",
+#     #           position = position_dodge(0.9), size=3.5) +
+#     theme_minimal() +
+#     labs(x = "Cluster",
+#          y = "Number of Cells") +
+#     scale_fill_manual(values = treat_col, 
+#                       name = "Treatment") +
+#     theme(
+#         panel.grid = element_blank(), 
+#         legend.margin=margin(0,0,0,0),
+#         legend.box.margin=margin(-10,0,-10,-10)
+#     )
+# chap5_sup2 <- (bar_byPatient | bar_byTreat) + 
+#     plot_layout(guides = "collect") +
+#     plot_annotation(tag_levels = 'A') &
+#     theme(
+#         text = element_text(size = 50),
+#         # axis.text.x = element_text(size = 50),
+#         plot.tag = element_text(size = 55, face = "bold" ), 
+#         legend.key.size = unit(2, "cm")
+#     )
+# # png(
+# #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup2.png",
+# #     height = 1200,
+# #     width = 2200
+# # )
+# chap5_sup2
+# # dev.off()
 ```
+
+
 # Seesion Information
 
 ```{r}
