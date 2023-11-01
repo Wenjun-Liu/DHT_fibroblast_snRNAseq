@@ -392,8 +392,8 @@ The `Seurat` object was broken into parts so it could be converted into an `Anno
 # write.csv(fibroblast@meta.data, file=here::here("output/metadata.csv"), quote=F, row.names=F)
 # counts_matrix <- GetAssayData(fibroblast, assay='RNA', slot='counts')
 # Matrix::writeMM(counts_matrix, file=here::here("output/counts.mtx"))
-# write.csv(fibroblast@reductions$pca@cell.embeddings, 
-#           file=here::here("output/pca.csv"), 
+# write.csv(fibroblast@reductions$pca@cell.embeddings,
+#           file=here::here("output/pca.csv"),
 #           quote=F, row.names=F)
 # write.table(
 #   data.frame('gene'=rownames(counts_matrix)),file=here::here("output/gene_names.csv"),
@@ -451,7 +451,7 @@ chap5_fig4 <- (predBar_hpca / predBar_wu) +
 # dev.off()
 ```
 
-```{r, fig.height=15, fig.width=9}
+```{r, fig.height=5, fig.width=9}
 chap5_fig5 <- (p1 | p2 )  + 
     plot_annotation(
         tag_levels = "A"
@@ -461,12 +461,12 @@ chap5_fig5 <- (p1 | p2 )  +
         plot.tag = element_text(size = 24, face = "bold" ), 
         # legend.key.size = unit(2, "cm")
     )
-# png(
-#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig5.png",
-#     width = 600, height =270, units='mm', res = 300
-# )
-# chap5_fig5
-# dev.off()
+png(
+    "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig5.png",
+    width = 600, height =270, units='mm', res = 300
+)
+chap5_fig5
+dev.off()
 ```
 
 

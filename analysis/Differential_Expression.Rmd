@@ -893,329 +893,329 @@ AUC_matrix_stemness %>%
 
 Code for reproducing figures used in the theis:
 
-<!-- ```{r} -->
-<!-- library(writexl) -->
-<!-- # save global DEGs to excel spreadsheet -->
-<!-- zlm_summary_mixed %>% -->
-<!--     dplyr::filter( -->
-<!--         FDR < 0.01 -->
-<!--     ) %>% -->
-<!--     dplyr::select(gene_name, Pvalue = `Pr(>Chisq)`,  -->
-<!--            logFC, FDR) %>% -->
-<!--     write_xlsx(here::here("output/DE_global.xlsx")) -->
-<!-- ``` -->
+```{r}
+library(writexl)
+# save global DEGs to excel spreadsheet
+zlm_summary_mixed %>%
+    dplyr::filter(
+        FDR < 0.01
+    ) %>%
+    dplyr::select(gene_name, Pvalue = `Pr(>Chisq)`,
+           logFC, FDR) %>%
+    write_xlsx(here::here("output/DE_global.xlsx"))
+```
 
-<!-- ```{r} -->
-<!-- # Table 5.3 -->
-<!-- zlm_summary_mixed %>% -->
-<!--     dplyr::filter( -->
-<!--         FDR < 0.01,  -->
-<!--         gene_name %in% AR_sig$gene_name -->
-<!--     )  %>% -->
-<!--     left_join( -->
-<!--         AR_sig  -->
-<!--     ) %>% -->
-<!--     mutate( -->
-<!--         Align = case_when( -->
-<!--             logFC < 0 & AR_sig == "Down" ~ "✓", -->
-<!--             logFC > 0 & AR_sig == "Up" ~ "✓", -->
-<!--             logFC < 0 & AR_sig == "Up" ~ "✗", -->
-<!--             logFC > 0 & AR_sig == "Down" ~ "✗" -->
-<!--         ),  -->
-<!--         AR_sig = ifelse( -->
-<!--             AR_sig == "Down", "\\color{blue}Down", "\\color{red}Up" -->
-<!--         ),  -->
-<!--         gene_name = paste("\\textit{", gene_name, "}", sep = "") -->
-<!--     ) %>% -->
-<!--     mutate_if(is.character, as.factor) %>% -->
-<!--     .[order(.$FDR),] %>% -->
-<!--     mutate_at(vars(c("Pr(>Chisq)", "FDR")), formatP) %>% -->
-<!--     mutate(logFC = ifelse( -->
-<!--         abs(logFC) < 0.01, sprintf("%.2e", logFC), sprintf("%.2f", logFC))) %>% -->
-<!--     # mutate(logFC = as.character(round(logFC, 4))) %>% -->
-<!--     dplyr::select( -->
-<!--         `Gene Name` = gene_name, -->
-<!--         `Expected Direction` = AR_sig, -->
-<!--         logFC,FDR, Concordant = Align -->
-<!--     ) %>% -->
-<!--     xtable::xtable( -->
-<!--         caption = "AR signatures defined in ER-positive BC\\cite{hickey_androgen_2021} that were also differentially expressed upon DHT treatment in mammary fibroblasts. The concordant column reflects whether the signs of logFCs in fibroblasts agreed with the signature types in malignant epithelial cells (ie. expected direction).",  -->
-<!--         label = "chap5_table3" -->
-<!--     )  %>% -->
-<!--      xtable::print.xtable( -->
-<!--         "~/PhD_thesis/draft_figure/chapter_05/table3.tex", type = "latex", -->
-<!--         caption.placement = "top", -->
-<!--         include.rownames = FALSE, -->
-<!--         sanitize.text.function = function(x) x) -->
-<!-- ``` -->
+```{r}
+# Table 5.3
+zlm_summary_mixed %>%
+    dplyr::filter(
+        FDR < 0.01,
+        gene_name %in% AR_sig$gene_name
+    )  %>%
+    left_join(
+        AR_sig
+    ) %>%
+    mutate(
+        Align = case_when(
+            logFC < 0 & AR_sig == "Down" ~ "✓",
+            logFC > 0 & AR_sig == "Up" ~ "✓",
+            logFC < 0 & AR_sig == "Up" ~ "✗",
+            logFC > 0 & AR_sig == "Down" ~ "✗"
+        ),
+        AR_sig = ifelse(
+            AR_sig == "Down", "\\color{blue}Down", "\\color{red}Up"
+        ),
+        gene_name = paste("\\textit{", gene_name, "}", sep = "")
+    ) %>%
+    mutate_if(is.character, as.factor) %>%
+    .[order(.$FDR),] %>%
+    mutate_at(vars(c("Pr(>Chisq)", "FDR")), formatP) %>%
+    mutate(logFC = ifelse(
+        abs(logFC) < 0.01, sprintf("%.2e", logFC), sprintf("%.2f", logFC))) %>%
+    # mutate(logFC = as.character(round(logFC, 4))) %>%
+    dplyr::select(
+        `Gene Name` = gene_name,
+        `Expected Direction` = AR_sig,
+        logFC,FDR, Concordant = Align
+    ) %>%
+    xtable::xtable(
+        caption = "AR signatures defined in ER-positive BC\\cite{hickey_androgen_2021} that were also differentially expressed upon DHT treatment in mammary fibroblasts. The concordant column reflects whether the signs of logFCs in fibroblasts agreed with the signature types in malignant epithelial cells (ie. expected direction).",
+        label = "chap5_table3"
+    )  %>%
+     xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/table3.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        sanitize.text.function = function(x) x)
+```
 
-<!-- ```{r} -->
-<!-- chap5_fig7 <- cor_plot & -->
-<!--     theme( -->
-<!--         text = element_text(size = 50) -->
-<!--     ) -->
-<!-- # png( -->
-<!-- #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig7.png", -->
-<!-- #     height = 1600, -->
-<!-- #     width = 2000 -->
-<!-- # ) -->
-<!-- #chap5_fig7 -->
-<!-- # dev.off() -->
-<!-- ``` -->
+```{r}
+chap5_fig7 <- cor_plot &
+    theme(
+        text = element_text(size = 50)
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig7.png",
+#     height = 1600,
+#     width = 2000
+# )
+#chap5_fig7
+# dev.off()
+```
 
-<!-- ```{r} -->
-<!-- # Table of num of DEGs in each cluster -->
-<!-- cluster_summary_ls %>% -->
-<!--     lapply(dplyr::filter, DE) %>% -->
-<!--     vapply(nrow, numeric(1)) %>% -->
-<!--     enframe( -->
-<!--         name = "Cluster",  -->
-<!--         value = "Number of DEGs" -->
-<!--     ) %>% -->
-<!--     left_join( -->
-<!--         cluster_summary_ls %>% -->
-<!--             vapply(nrow, numeric(1)) %>% -->
-<!--             enframe( -->
-<!--                 name = "Cluster",  -->
-<!--                 value = "Number of tested genes" -->
-<!--             )   -->
-<!--     ) %>% -->
-<!--     xtable::xtable( -->
-<!--         caption = "The numbers of tested genes and detected DEGs in each cluster. DE analyses were performed using MAST with patient as a random effect. Only genes that were expressed in at least 10% of either DHT- or vehicle-treated cells in each cluster were testde for differential expression. Genes with an FDR smaller than 0.01 were considered to be DEGs",  -->
-<!--         label = "chap5_tableDE",  -->
-<!--         digits = 0 -->
-<!--     )  %>% -->
-<!--     xtable::print.xtable( -->
-<!--         "~/PhD_thesis/draft_figure/chapter_05/clsuter_DE.tex", type = "latex", -->
-<!--         caption.placement = "top", -->
-<!--         include.rownames = FALSE, -->
-<!--         sanitize.text.function = function(x) x) -->
-<!-- ``` -->
+```{r}
+# Table of num of DEGs in each cluster
+cluster_summary_ls %>%
+    lapply(dplyr::filter, DE) %>%
+    vapply(nrow, numeric(1)) %>%
+    enframe(
+        name = "Cluster",
+        value = "Number of DEGs"
+    ) %>%
+    left_join(
+        cluster_summary_ls %>%
+            vapply(nrow, numeric(1)) %>%
+            enframe(
+                name = "Cluster",
+                value = "Number of tested genes"
+            )
+    ) %>%
+    xtable::xtable(
+        caption = "The numbers of tested genes and detected DEGs in each cluster. DE analyses were performed using MAST with patient as a random effect. Only genes that were expressed in at least 10% of either DHT- or vehicle-treated cells in each cluster were testde for differential expression. Genes with an FDR smaller than 0.01 were considered to be DEGs",
+        label = "chap5_tableDE",
+        digits = 0
+    )  %>%
+    xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/clsuter_DE.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        sanitize.text.function = function(x) x)
+```
 
-<!-- ```{r} -->
-<!-- #DE upset plot -->
-<!-- DE_upset <- cluster_summary_ls %>% -->
-<!--     lapply(dplyr::filter, DE) %>% -->
-<!--     lapply(dplyr::select, cluster, gene_name) %>% -->
-<!--     bind_rows() %>% -->
-<!--     mutate(Present = 1) %>% -->
-<!--     pivot_wider(names_from = cluster, values_from = Present, values_fill = 0) %>% -->
-<!--     column_to_rownames("gene_name") %>% -->
-<!--     set_colnames(paste("Cluster", colnames(.), sep = " ")) %>% -->
-<!--     ComplexUpset::upset( -->
-<!--         intersect = colnames(.),  -->
-<!--         group_by = 'degree',  -->
-<!--         sort_sets = FALSE, -->
-<!--         set_sizes = FALSE,  -->
-<!--         queries=list( -->
-<!--             upset_query(intersect=colnames(.), color='orange', fill = 'orange')),  -->
-<!--         base_annotations=list( -->
-<!--             'Intersection size'=intersection_size( -->
-<!--                 text_mapping=aes( -->
-<!--                     label=ifelse( -->
-<!--                     !!get_size_mode('exclusive_intersection') == 32, -->
-<!--                     !!get_size_mode('exclusive_intersection'), NA),  -->
-<!--                     colour=ifelse( -->
-<!--                     !!get_size_mode('exclusive_intersection') == 32, -->
-<!--                     'on_bar', 'on_background'), -->
-<!--                 ),  -->
-<!--                 text_colors=c( -->
-<!--                      on_bar = 'orange', on_background="white" -->
-<!--                 ),  -->
-<!--                 text = list( -->
-<!--                     size = 5 -->
-<!--                 ) -->
-<!--             ) -->
-<!--             + ylab('Intersection size') -->
-<!--         ),  -->
-<!--         # min_size = 2,  -->
-<!--         themes=upset_default_themes( -->
-<!--             text = element_text(size = 12),  -->
-<!--             axis.title.x = element_blank()) -->
-<!--     ) -->
-<!-- # png( -->
-<!-- #     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/DE_upset.png", -->
-<!-- #     width = 210, height =130, units='mm', res = 300 -->
-<!-- # ) -->
-<!-- # DE_upset -->
-<!-- # dev.off() -->
-<!-- ``` -->
+```{r}
+#DE upset plot
+DE_upset <- cluster_summary_ls %>%
+    lapply(dplyr::filter, DE) %>%
+    lapply(dplyr::select, cluster, gene_name) %>%
+    bind_rows() %>%
+    mutate(Present = 1) %>%
+    pivot_wider(names_from = cluster, values_from = Present, values_fill = 0) %>%
+    column_to_rownames("gene_name") %>%
+    set_colnames(paste("Cluster", colnames(.), sep = " ")) %>%
+    ComplexUpset::upset(
+        intersect = colnames(.),
+        group_by = 'degree',
+        sort_sets = FALSE,
+        set_sizes = FALSE,
+        queries=list(
+            upset_query(intersect=colnames(.), color='orange', fill = 'orange')),
+        base_annotations=list(
+            'Intersection size'=intersection_size(
+                text_mapping=aes(
+                    label=ifelse(
+                    !!get_size_mode('exclusive_intersection') == 32,
+                    !!get_size_mode('exclusive_intersection'), NA),
+                    colour=ifelse(
+                    !!get_size_mode('exclusive_intersection') == 32,
+                    'on_bar', 'on_background'),
+                ),
+                text_colors=c(
+                     on_bar = 'orange', on_background="white"
+                ),
+                text = list(
+                    size = 5
+                )
+            )
+            + ylab('Intersection size')
+        ),
+        # min_size = 2,
+        themes=upset_default_themes(
+            text = element_text(size = 12),
+            axis.title.x = element_blank())
+    )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/DE_upset.png",
+#     width = 210, height =130, units='mm', res = 300
+# )
+# DE_upset
+# dev.off()
+```
 
-<!-- ```{r} -->
-<!-- # png( -->
-<!-- #     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/hp_32DEG.png", -->
-<!-- #     width = 190, height =140, units='mm', res = 300 -->
-<!-- # ) -->
-<!-- # deg32_df %>% -->
-<!-- #     pivot_wider( -->
-<!-- #         names_from = "cluster",  -->
-<!-- #         values_from = "logFC" -->
-<!-- #     ) %>% -->
-<!-- #     column_to_rownames("gene_name") %>% -->
-<!-- #     pheatmap( -->
-<!-- #         annotation_col = anno_df %>% -->
-<!-- #             column_to_rownames("cluster"),  -->
-<!-- #         annotation_colors = list( -->
-<!-- #            `Dominant Patient` = patient_col -->
-<!-- #         ), -->
-<!-- #         cutree_cols = 2,  -->
-<!-- #         cutree_rows = 2, -->
-<!-- #         legend_breaks = c(seq(-0.4, 0.4, length.out = 5), max(deg32_df$logFC)),  -->
-<!-- #         legend_labels = c(seq(-0.4, 0.4, length.out = 5), "LogFC\n") -->
-<!-- #     ) -->
-<!-- # dev.off() -->
-<!-- ``` -->
+```{r}
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/hp_32DEG.png",
+#     width = 190, height =140, units='mm', res = 300
+# )
+# deg32_df %>%
+#     pivot_wider(
+#         names_from = "cluster",
+#         values_from = "logFC"
+#     ) %>%
+#     column_to_rownames("gene_name") %>%
+#     pheatmap(
+#         annotation_col = anno_df %>%
+#             column_to_rownames("cluster"),
+#         annotation_colors = list(
+#            `Dominant Patient` = patient_col
+#         ),
+#         cutree_cols = 2,
+#         cutree_rows = 2,
+#         legend_breaks = c(seq(-0.4, 0.4, length.out = 5), max(deg32_df$logFC)),
+#         legend_labels = c(seq(-0.4, 0.4, length.out = 5), "LogFC\n")
+#     )
+# dev.off()
+```
 
-<!-- ```{r} -->
-<!-- # png( -->
-<!-- #     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/hp_global_top10.png", -->
-<!-- #     width = 190, height =140, units='mm', res = 300 -->
-<!-- # ) -->
-<!-- # global_top10_df %>% -->
-<!-- #     pheatmap( -->
-<!-- #         annotation_col = anno_df %>% -->
-<!-- #             column_to_rownames("cluster"),  -->
-<!-- #         annotation_colors = list( -->
-<!-- #            `Dominant Patient` = patient_col -->
-<!-- #         ), -->
-<!-- #         cutree_cols = 2,  -->
-<!-- #         legend_breaks = c(seq(-0.5, 0.5, length.out = 5), max(global_top10_df)),  -->
-<!-- #         legend_labels = c(seq(-0.5, 0.5, length.out = 5), "LogFC\n") -->
-<!-- #     ) -->
-<!-- # dev.off() -->
-<!-- ``` -->
+```{r}
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/hp_global_top10.png",
+#     width = 190, height =140, units='mm', res = 300
+# )
+# global_top10_df %>%
+#     pheatmap(
+#         annotation_col = anno_df %>%
+#             column_to_rownames("cluster"),
+#         annotation_colors = list(
+#            `Dominant Patient` = patient_col
+#         ),
+#         cutree_cols = 2,
+#         legend_breaks = c(seq(-0.5, 0.5, length.out = 5), max(global_top10_df)),
+#         legend_labels = c(seq(-0.5, 0.5, length.out = 5), "LogFC\n")
+#     )
+# dev.off()
+```
 
-<!-- ```{r} -->
-<!-- #save cluster-specific DE results to spreadsheet -->
-<!-- library(writexl) -->
-<!-- DE_suppTable <- cluster_summary_ls %>% -->
-<!--     lapply(dplyr::filter, DE) %>% -->
-<!--     lapply(dplyr::select, gene_name, Pvalue = `Pr(>Chisq)`,  -->
-<!--            logFC, FDR,  cluster) -->
-<!-- names(DE_suppTable) <- paste("Cluster", names(DE_suppTable), sep = "_") -->
-<!-- # write_xlsx(DE_suppTable, here::here("output/DE_suppTable.xlsx")) -->
-<!-- ``` -->
+```{r}
+#save cluster-specific DE results to spreadsheet
+library(writexl)
+DE_suppTable <- cluster_summary_ls %>%
+    lapply(dplyr::filter, DE) %>%
+    lapply(dplyr::select, gene_name, Pvalue = `Pr(>Chisq)`,
+           logFC, FDR,  cluster)
+names(DE_suppTable) <- paste("Cluster", names(DE_suppTable), sep = "_")
+# write_xlsx(DE_suppTable, here::here("output/DE_suppTable.xlsx"))
+```
 
-<!-- ```{r} -->
-<!-- goseq_kg_ls %>% -->
-<!--     lapply(dplyr::filter, FDR < 0.05) %>% -->
-<!--     vapply(nrow, numeric(1)) %>% -->
-<!--     enframe( -->
-<!--         name = "Cluster",  -->
-<!--         value = "Number of significantly\nenriched pathways" -->
-<!--     ) %>% -->
-<!--     xtable::xtable( -->
-<!--         caption = "The numbers of KEGG pathways that were significantly over-repsented in each cluster. The enrichment analysis was performed using GOseq\\cite{young_mgeethnode_2010}, with gene length as an offset term to account for any bias. Pathways with an FDR \\textless 0.05 were considered to be significantly enriched.",  -->
-<!--         label = "path_numb",  -->
-<!--         digits = 0 -->
-<!--     )  %>% -->
-<!--     xtable::print.xtable( -->
-<!--         "~/PhD_thesis/draft_figure/chapter_05/path_num.tex", type = "latex", -->
-<!--         caption.placement = "top", -->
-<!--         include.rownames = FALSE, -->
-<!--         sanitize.text.function = function(x) x) -->
-<!-- ``` -->
+```{r}
+goseq_kg_ls %>%
+    lapply(dplyr::filter, FDR < 0.05) %>%
+    vapply(nrow, numeric(1)) %>%
+    enframe(
+        name = "Cluster",
+        value = "Number of significantly\nenriched pathways"
+    ) %>%
+    xtable::xtable(
+        caption = "The numbers of KEGG pathways that were significantly over-repsented in each cluster. The enrichment analysis was performed using GOseq\\cite{young_mgeethnode_2010}, with gene length as an offset term to account for any bias. Pathways with an FDR \\textless 0.05 were considered to be significantly enriched.",
+        label = "path_numb",
+        digits = 0
+    )  %>%
+    xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/path_num.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        sanitize.text.function = function(x) x)
+```
 
-<!-- ```{r} -->
-<!-- ## Supp Table: significantly enriched pathways in each cluster -->
-<!-- path_suppTable <- goseq_kg_ls %>% -->
-<!--     lapply(dplyr::filter, FDR < 0.05) %>% -->
-<!--     lapply(function(x){mutate(x, gs_name = str_remove_all(x$gs_name, "kegg."))}) %>% -->
-<!--     lapply(dplyr::select, gs_name, nExpressed, nDE, FDR) -->
-<!-- names(path_suppTable) <- paste("Cluster", names(path_suppTable), sep = "_") -->
-<!-- # write_xlsx(path_suppTable, here::here("output/path_suppTable.xlsx")) -->
-<!-- ``` -->
+```{r}
+## Supp Table: significantly enriched pathways in each cluster
+path_suppTable <- goseq_kg_ls %>%
+    lapply(dplyr::filter, FDR < 0.05) %>%
+    lapply(function(x){mutate(x, gs_name = str_remove_all(x$gs_name, "kegg."))}) %>%
+    lapply(dplyr::select, gs_name, nExpressed, nDE, FDR)
+names(path_suppTable) <- paste("Cluster", names(path_suppTable), sep = "_")
+# write_xlsx(path_suppTable, here::here("output/path_suppTable.xlsx"))
+```
 
-<!-- ```{r} -->
-<!-- # png( -->
-<!-- #     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/pathway_upset.png", -->
-<!-- #     width = 230, height =150, units='mm', res = 300 -->
-<!-- # ) -->
-<!-- # goseq_kg_ls %>% -->
-<!-- #     lapply(dplyr::filter, FDR < 0.05) %>% -->
-<!-- #     lapply(pull, gs_name) %>% -->
-<!-- #     fromList() %>% -->
-<!-- #     set_colnames(paste("Cluster", colnames(.), sep = " ")) %>% -->
-<!-- #     UpSetR::upset( -->
-<!-- #         sets = colnames(.),  -->
-<!-- #         nintersects = NA,  -->
-<!-- #         keep.order = TRUE, -->
-<!-- #         queries = list( -->
-<!-- #           list( -->
-<!-- #              query = intersects,  -->
-<!-- #              params = list(setdiff(colnames(.), "Cluster 6")), -->
-<!-- #              color = "orange", -->
-<!-- #              active = T), -->
-<!-- #           list( -->
-<!-- #              query = intersects,  -->
-<!-- #              params = list("Cluster 1"), -->
-<!-- #              color = 'forestgreen', -->
-<!-- #              active = T),  -->
-<!-- #           list( -->
-<!-- #              query = intersects,  -->
-<!-- #              params = list(setdiff(colnames(.), c("Cluster 2", "Cluster 6"))), -->
-<!-- #              color = '#9565CD', -->
-<!-- #              active = T) -->
-<!-- #         ),  -->
-<!-- #         text.scale = 2 -->
-<!-- #     ) -->
-<!-- # dev.off() -->
-<!-- ``` -->
+```{r}
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/pathway_upset.png",
+#     width = 230, height =150, units='mm', res = 300
+# )
+# goseq_kg_ls %>%
+#     lapply(dplyr::filter, FDR < 0.05) %>%
+#     lapply(pull, gs_name) %>%
+#     fromList() %>%
+#     set_colnames(paste("Cluster", colnames(.), sep = " ")) %>%
+#     UpSetR::upset(
+#         sets = colnames(.),
+#         nintersects = NA,
+#         keep.order = TRUE,
+#         queries = list(
+#           list(
+#              query = intersects,
+#              params = list(setdiff(colnames(.), "Cluster 6")),
+#              color = "orange",
+#              active = T),
+#           list(
+#              query = intersects,
+#              params = list("Cluster 1"),
+#              color = 'forestgreen',
+#              active = T),
+#           list(
+#              query = intersects,
+#              params = list(setdiff(colnames(.), c("Cluster 2", "Cluster 6"))),
+#              color = '#9565CD',
+#              active = T)
+#         ),
+#         text.scale = 2
+#     )
+# dev.off()
+```
 
-<!-- ```{r} -->
-<!-- goseq_kg_ls[["1"]] %>% -->
-<!--     dplyr::filter(gs_name %in% clu1_specific_gs) %>% -->
-<!--     mutate( -->
-<!--         gs_name = str_remove_all(gs_name, "kegg.") -->
-<!--     ) %>% -->
-<!--     dplyr::select( -->
-<!--         `Gene-set name` = gs_name,  -->
-<!--         nDE,  nExpressed, FDR -->
-<!--     ) %>% -->
-<!--     xtable::xtable( -->
-<!--         caption = "KEGG pathways that were uniquely over-represented due to the DHT treatment in cluster 1",  -->
-<!--         label = "clu1_unique",  -->
-<!--         digits = 0 -->
-<!--     )  %>% -->
-<!--     xtable::print.xtable( -->
-<!--         "~/PhD_thesis/draft_figure/chapter_05/clu1_unique.tex", type = "latex", -->
-<!--         caption.placement = "top", -->
-<!--         include.rownames = FALSE, -->
-<!--         sanitize.text.function = function(x) x) -->
-<!-- ``` -->
+```{r}
+goseq_kg_ls[["1"]] %>%
+    dplyr::filter(gs_name %in% clu1_specific_gs) %>%
+    mutate(
+        gs_name = str_remove_all(gs_name, "kegg.")
+    ) %>%
+    dplyr::select(
+        `Gene-set name` = gs_name,
+        nDE,  nExpressed, FDR
+    ) %>%
+    xtable::xtable(
+        caption = "KEGG pathways that were uniquely over-represented due to the DHT treatment in cluster 1",
+        label = "clu1_unique",
+        digits = 0
+    )  %>%
+    xtable::print.xtable(
+        "~/PhD_thesis/draft_figure/chapter_05/clu1_unique.tex", type = "latex",
+        caption.placement = "top",
+        include.rownames = FALSE,
+        sanitize.text.function = function(x) x)
+```
 
-<!-- ```{r} -->
-<!-- stem_boxplot <- AUC_matrix_stemness %>% -->
-<!--         t() %>% -->
-<!--     as.data.frame() %>% -->
-<!--     rownames_to_column("cell") %>% -->
-<!--     left_join( -->
-<!--         fibroblast[[]] %>% -->
-<!--             rownames_to_column("cell") -->
-<!--     ) %>% -->
-<!--     mutate( -->
-<!--         Treatment = factor(Treatment, levels = c("VEH", "DHT")) -->
-<!--     ) %>% -->
-<!--     ggplot( -->
-<!--         aes(cluster, stemness, fill = Treatment) -->
-<!--     ) + -->
-<!--     geom_boxplot() + -->
-<!--     scale_fill_manual(values = treat_col) + -->
-<!--     labs( -->
-<!--         x = "Cluster",  -->
-<!--         y = "Cell Stemness Score" -->
-<!--     ) + -->
-<!--     theme( -->
-<!--         text = element_text(size = 12), -->
-<!--         axis.text.x = element_text( -->
-<!--         colour = c("black","orange", rep("black", 5)),  -->
-<!--         size = c(12, 20, rep(12, 5)) -->
-<!--     )) -->
-<!-- # png( -->
-<!-- #     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/stem_boxplot.png", -->
-<!-- #     width = 180, height =100, units='mm', res = 300 -->
-<!-- # ) -->
-<!-- # stem_boxplot -->
-<!-- # dev.off() -->
-<!-- ``` -->
+```{r}
+stem_boxplot <- AUC_matrix_stemness %>%
+        t() %>%
+    as.data.frame() %>%
+    rownames_to_column("cell") %>%
+    left_join(
+        fibroblast[[]] %>%
+            rownames_to_column("cell")
+    ) %>%
+    mutate(
+        Treatment = factor(Treatment, levels = c("VEH", "DHT"))
+    ) %>%
+    ggplot(
+        aes(cluster, stemness, fill = Treatment)
+    ) +
+    geom_boxplot() +
+    scale_fill_manual(values = treat_col) +
+    labs(
+        x = "Cluster",
+        y = "Cell Stemness Score"
+    ) +
+    theme(
+        text = element_text(size = 12),
+        axis.text.x = element_text(
+        colour = c("black","orange", rep("black", 5)),
+        size = c(12, 20, rep(12, 5))
+    ))
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/chapter_05/stem_boxplot.png",
+#     width = 180, height =100, units='mm', res = 300
+# )
+# stem_boxplot
+# dev.off()
+```
 

@@ -141,10 +141,10 @@ names(QCplot) <- c("nFeature_RNA", "nCount_RNA", "percent.mt")
 
 ```
 
-Cells that have unique feature counts over 4,000 or less than 200 and ones have >5% mitochondrial counts were filtered out. 
+Cells that have unique feature counts over 4,000 or less than 200 mitochondrial counts were filtered out. 
 
 ```{r}
-fibroblast <- subset(fibroblast, subset = nFeature_RNA > 200 & nFeature_RNA < 4000 & percent.mt < 5)
+fibroblast <- subset(fibroblast, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
 ```
 
 `r ncol(fibroblast)` cells passed the filtration criteria. 
@@ -553,90 +553,90 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 # Thesis figures
 
 ```{r}
-# # Table 1 number of cells per cluster
-# num_cell %>%
-#     dplyr::select(cluster, total) %>%
-#     mutate(cluster = paste("Cluster", cluster, sep = " ")) %>%
-#     unique() %>%
-#     ungroup() %>%
-#     add_row(
-#         summarise(
-#             ., 
-#             cluster = "Total", 
-#             total = sum(total)
-#         )
-#     ) %>%
-#     dplyr::rename(
-#         Cluster = cluster, 
-#         `Number of cells` = total
-#     ) %>%
-#     xtable::xtable(
-#         caption = "The numbers of cells assigned to each mammary fibroblasts snRNA-seq cluster.The numbers of cells assigned to each mammary fibroblasts snRNA-seq cluster. Clusters were identified through a shared nearest neighbor (SNN) modularity optimization based clustering algorithm provided by the Seurat's FindClusters function, with the resolution set to 0.3.",
-#         label = "chap5_table1"
-#     )  %>%
-#     print("~/PhD_thesis/draft_figure/chapter_05/table1.tex", type = "latex",
-#           caption.placement = "top",
-#           include.rownames = FALSE,
-#           # booktabs = TRUE
-#     )
+# Table 1 number of cells per cluster
+num_cell %>%
+    dplyr::select(cluster, total) %>%
+    mutate(cluster = paste("Cluster", cluster, sep = " ")) %>%
+    unique() %>%
+    ungroup() %>%
+    add_row(
+        summarise(
+            .,
+            cluster = "Total",
+            total = sum(total)
+        )
+    ) %>%
+    dplyr::rename(
+        Cluster = cluster,
+        `Number of cells` = total
+    ) %>%
+    xtable::xtable(
+        caption = "The numbers of cells assigned to each mammary fibroblasts snRNA-seq cluster.The numbers of cells assigned to each mammary fibroblasts snRNA-seq cluster. Clusters were identified through a shared nearest neighbor (SNN) modularity optimization based clustering algorithm provided by the Seurat's FindClusters function, with the resolution set to 0.3.",
+        label = "chap5_table1"
+    )  %>%
+    print("~/PhD_thesis/draft_figure/chapter_05/table1.tex", type = "latex",
+          caption.placement = "top",
+          include.rownames = FALSE,
+          # booktabs = TRUE
+    )
 ```
 
 
 ```{r}
-## Table 2 (Marker genes defining each cluster)
-# library(kableExtra)
-# cluster_marker %>%
-#     mutate(
-#         cluster = paste("Cluster", cluster, sep = " "), 
-#         description = gsub("\\[.*\\]", "", description)
-#     ) %>%
-#     # left_join(
-#     #     kg
-#     # ) %>%
-#     dplyr::select(
-#         Cluster = cluster, 
-#         `Gene name` = gene_name, 
-#         Description = description,
-#         # `Gene-set name` = gs_name
-#     ) %>%
-#     unique() %>%
-#     xtable::xtable(
-#         caption = "Top marker genes selected for each cluster in the single-nucleus mammary gland fibroblast RNA-seq data]{The top 10 genes with the highest mean log2FC for clusters where more than 10 marker genes were detected, or all markers for clusters with a lower number of marker genes, along with each gene's description retrieved from Ensembl release 101.",
-#         label = "chap5_table1", 
-#         longtable = TRUE, 
-#         type = "latex",
-#         booktabs = TRUE
-#     )  %>%
-#     print("~/PhD_thesis/draft_figure/chapter_05/table2.tex",
-#           caption.placement = "top",
-#           type = "latex",
-#           include.rownames = FALSE
-#     )
+# Table 2 (Marker genes defining each cluster)
+library(kableExtra)
+cluster_marker %>%
+    mutate(
+        cluster = paste("Cluster", cluster, sep = " "),
+        description = gsub("\\[.*\\]", "", description)
+    ) %>%
+    # left_join(
+    #     kg
+    # ) %>%
+    dplyr::select(
+        Cluster = cluster,
+        `Gene name` = gene_name,
+        Description = description,
+        # `Gene-set name` = gs_name
+    ) %>%
+    unique() %>%
+    xtable::xtable(
+        caption = "Top marker genes selected for each cluster in the single-nucleus mammary gland fibroblast RNA-seq data]{The top 10 genes with the highest mean log2FC for clusters where more than 10 marker genes were detected, or all markers for clusters with a lower number of marker genes, along with each gene's description retrieved from Ensembl release 101.",
+        label = "chap5_table1",
+        longtable = TRUE,
+        type = "latex",
+        booktabs = TRUE
+    )  %>%
+    print("~/PhD_thesis/draft_figure/chapter_05/table2.tex",
+          caption.placement = "top",
+          type = "latex",
+          include.rownames = FALSE
+    )
 ```
 
 ```{r, fig.height=16, fig.width=18, fig.cap="*Figure 2. UMAP plots coloured by (A) clusters formed, (B) patient origin and (C) treatment, and (D) the numbers of useable cells detected in each sample. A cell was considered useable if it has >200 and <43,000 unique feature counts, in addition to <5% mitochondrial genes.*"}
-# library(patchwork)
-# chap5_fig2 <- ((UMAP_clu | plot_spacer()| umap_p) +
-#                    plot_layout(
-#                        widths = c(0.5,0.05, 0.45))) / 
-#     ( umap_t | NumOfCells)  +
-#     plot_annotation(
-#         tag_levels = "A"
-#     ) & 
-#     theme(
-#         # axis.title = element_text(size = 20), 
-#         # legend.key.size = unit(1, 'cm'), 
-#         # legend.text = element_text(size = 16), 
-#         # legend.title = element_text(size = 18),
-#         text = element_text(size = 50),
-#         plot.tag = element_text(size = 55, face = "bold" )
-#     )
-# png(
-#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig2.png",
-#     height = 2000,
-#     width = 2800)
-# chap5_fig2
-# dev.off()
+library(patchwork)
+chap5_fig2 <- ((UMAP_clu | plot_spacer()| umap_p) +
+                   plot_layout(
+                       widths = c(0.5,0.05, 0.45))) /
+    ( umap_t | NumOfCells)  +
+    plot_annotation(
+        tag_levels = "A"
+    ) &
+    theme(
+        # axis.title = element_text(size = 20),
+        # legend.key.size = unit(1, 'cm'),
+        # legend.text = element_text(size = 16),
+        # legend.title = element_text(size = 18),
+        text = element_text(size = 50),
+        plot.tag = element_text(size = 55, face = "bold" )
+    )
+png(
+    "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig2.png",
+    height = 2000,
+    width = 2800)
+chap5_fig2
+dev.off()
 ```
 
 ```{r}
@@ -653,12 +653,12 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #     ) %>%
 #     mutate(
 #         label = case_when(
-#             DPP4 == 0 & ENG != 0 ~ "Intra-lobular", 
+#             DPP4 == 0 & ENG != 0 ~ "Intra-lobular",
 #             DPP4 != 0 & ENG == 0 ~ "Inter-lobular"),
 #          label = ifelse(
 #              is.na(label), "Undefinitive", label
 #          )
-#     ) 
+#     )
 # fibroblast$location_label <- temp %>%
 #     .[match(colnames(fibroblast), .$cell),] %>%
 #     pull(label)
@@ -668,7 +668,7 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 # chap5_3a <- temp %>%
 #     pivot_longer(
 #         cols = c("DPP4", "ENG"),
-#         names_to = "gene_name", 
+#         names_to = "gene_name",
 #         values_to = "Log-norm Count"
 #     ) %>%
 #     mutate(
@@ -681,16 +681,16 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #     ) +
 #     geom_boxplot() +
 #     scale_fill_manual(
-#         values = patient_col, 
+#         values = patient_col,
 #         name = "Patient"
 #     ) +
 #     mdthemes::md_theme_classic() +
-#         xlab("") 
+#         xlab("")
 # temp <- temp %>%
 #     group_by(label) %>%
 #     mutate(
-#         n = n(), 
-#         label_n = paste(label,"\n(", comma(n), " cells)", sep = "")) 
+#         n = n(),
+#         label_n = paste(label,"\n(", comma(n), " cells)", sep = ""))
 # chap5_3b <- temp %>%
 #     ggplot(
 #         aes(ENG, DPP4, color = label)
@@ -698,10 +698,10 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #     geom_point() +
 #     scale_color_manual(
 #         values = c(
-#             "Intra-lobular" = "#ACA4E2", 
-#             "Inter-lobular" = "#5CBD92", 
+#             "Intra-lobular" = "#ACA4E2",
+#             "Inter-lobular" = "#5CBD92",
 #             "Undefinitive" = "gray"
-#         ), 
+#         ),
 #         name = "Subtype"
 #     ) +
 #     labs(
@@ -709,8 +709,8 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #         y = "Log-norm Count (*DPP4*)"
 #     ) +
 #     geom_abline(slope = 1,
-#                 size = 2, 
-#                 linetype = "dashed", 
+#                 size = 2,
+#                 linetype = "dashed",
 #                 color = "black") +
 #     mdthemes::md_theme_classic() +
 #     geom_mark_ellipse(
@@ -721,37 +721,37 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #     ) +
 #     theme(
 #         legend.position = "none"
-#     ) + 
+#     ) +
 #     guides(colour = guide_legend(override.aes = list(size=10)))
 # chap5_3c <- DimPlot(fibroblast, group.by = "location_label", pt.size = 1.5) +
 #     scale_color_manual(
 #         values = c(
-#             "Intra-lobular" = "#ACA4E2", 
-#             "Inter-lobular" = "#5CBD92", 
+#             "Intra-lobular" = "#ACA4E2",
+#             "Inter-lobular" = "#5CBD92",
 #             "Undefinitive" = "gray"
-#         ), 
+#         ),
 #         name = "Subtype"
 #     ) +
-#     ggtitle("")  + 
+#     ggtitle("")  +
 #     guides(colour = guide_legend(override.aes = list(size=10)))
 ```
 
 ```{r, fig.height=10, fig.width=18, fig.cap="*Figure 3. UMAP plots showing the expressions of (A) lobular marker ENG and (B) interlobular marker DPP4.*"}
 # chap5_fig3 <-  (((chap5_3a + labs(tag = 'A')) / (chap5_3c + labs(tag = 'C'))) | (chap5_3b + labs(tag = 'B'))) +
 #     plot_layout(
-#         guides = "collect", 
+#         guides = "collect",
 #         widths = c(0.4, 0.6)) &
 #     theme(
 #         text = element_text(size = 28),
-#         plot.tag = element_text(size = 35, face = "bold" ), 
+#         plot.tag = element_text(size = 35, face = "bold" ),
 #         legend.key.size = unit(2, "cm")
-#     ) 
-# # png(
-# #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig3.png",
-# #     width = 700, height =350, units='mm', res = 300
-# # )
-# # chap5_fig3
-# # dev.off()
+#     )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_fig3.png",
+#     width = 700, height =350, units='mm', res = 300
+# )
+# chap5_fig3
+# dev.off()
 ```
 
 
@@ -823,7 +823,7 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #     theme_minimal() +
 #     labs(x = "Cluster",
 #          y = "Number of Cells") +
-#     scale_fill_manual(values = patient_col, 
+#     scale_fill_manual(values = patient_col,
 #                       name = "Patient") +
 #     theme(
 #         panel.grid = element_blank(),
@@ -843,29 +843,29 @@ Most of the sequenced cells were predicted to have either a intra-lobular origin
 #     theme_minimal() +
 #     labs(x = "Cluster",
 #          y = "Number of Cells") +
-#     scale_fill_manual(values = treat_col, 
+#     scale_fill_manual(values = treat_col,
 #                       name = "Treatment") +
 #     theme(
-#         panel.grid = element_blank(), 
+#         panel.grid = element_blank(),
 #         legend.margin=margin(0,0,0,0),
 #         legend.box.margin=margin(-10,0,-10,-10)
 #     )
-# chap5_sup2 <- (bar_byPatient | bar_byTreat) + 
+# chap5_sup2 <- (bar_byPatient | bar_byTreat) +
 #     plot_layout(guides = "collect") +
 #     plot_annotation(tag_levels = 'A') &
 #     theme(
 #         text = element_text(size = 50),
 #         # axis.text.x = element_text(size = 50),
-#         plot.tag = element_text(size = 55, face = "bold" ), 
+#         plot.tag = element_text(size = 55, face = "bold" ),
 #         legend.key.size = unit(2, "cm")
 #     )
-# # png(
-# #     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup2.png",
-# #     height = 1200,
-# #     width = 2200
-# # )
+# png(
+#     "/Users/wenjunliu/PhD_thesis/Images/Chapter_05/chap5_sup2.png",
+#     height = 1200,
+#     width = 2200
+# )
 # chap5_sup2
-# # dev.off()
+# dev.off()
 ```
 
 
